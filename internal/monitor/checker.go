@@ -35,10 +35,10 @@ func Check(m *models.Monitor) *models.Heartbeat {
 
 		resp, err := client.Get(url)
 		duration := time.Since(start).Milliseconds()
-		hb.ResponseTimeMs = int(duration)
+		hb.Latency = int(duration)
 
 		if err != nil {
-			hb.ErrorMessage = err.Error()
+			hb.Message = err.Error()
 			return hb
 		}
 		defer resp.Body.Close()
@@ -47,16 +47,16 @@ func Check(m *models.Monitor) *models.Heartbeat {
 		if resp.StatusCode == m.ExpectedStatusCode {
 			hb.IsUp = true
 		} else {
-			hb.ErrorMessage = "Unexpected status code"
+			hb.Message = "Unexpected status code"
 		}
 
 	case "tcp":
 		conn, err := net.DialTimeout("tcp", m.URL, timeout)
 		duration := time.Since(start).Milliseconds()
-		hb.ResponseTimeMs = int(duration)
+		hb.Latency = int(duration)
 
 		if err != nil {
-			hb.ErrorMessage = err.Error()
+			hb.Message = err.Error()
 			return hb
 		}
 		conn.Close()
@@ -65,7 +65,7 @@ func Check(m *models.Monitor) *models.Heartbeat {
 	case "ping":
 		// Simple ping could be implemented, but for simplicity, we treat TCP dial on port 80/443 or similar as ping if it's an IP
 		// In a real scenario, ICMP ping requires root privileges or raw sockets
-		hb.ErrorMessage = "Ping type is not fully implemented yet, use TCP or HTTP"
+		hb.Message = "Ping type is not fully implemented yet, use TCP or HTTP"
 	}
 
 	return hb

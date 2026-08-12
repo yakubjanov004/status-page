@@ -108,7 +108,7 @@ func (s *Scheduler) runCheck(m *models.Monitor) {
 		telegramChatID := os.Getenv("TELEGRAM_CHAT_ID")
 		if telegramToken != "" && telegramChatID != "" {
 			go func() {
-				if err := notify.SendTelegramNotification(telegramToken, telegramChatID, m, hb.IsUp, hb.ErrorMessage); err != nil {
+				if err := notify.SendTelegramNotification(telegramToken, telegramChatID, m, hb.IsUp, hb.Message); err != nil {
 					log.Println("Failed to send telegram notification:", err)
 				}
 			}()
