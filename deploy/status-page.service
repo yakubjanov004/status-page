@@ -11,6 +11,9 @@ ExecStart=/opt/status-page/status-page
 Restart=always
 RestartSec=5
 EnvironmentFile=/opt/status-page/.env
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=status-page
 
 [Install]
 WantedBy=multi-user.target
