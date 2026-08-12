@@ -14,7 +14,6 @@ import (
 func NewRouter(cfg *config.Config) *chi.Mux {
 	r := chi.NewRouter()
 
-	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: []string{"*"},
@@ -22,22 +21,31 @@ func NewRouter(cfg *config.Config) *chi.Mux {
 		AllowedHeaders: []string{"Accept", "Content-Type"},
 	}))
 
-	// Faqat public API — admin panel yo'q
+	// Public API
 	r.Get("/api/public/status", GetPublicStatusHandler)
 
-	// WebSocket — real-time yangilanishlar
+	// WebSocket
 	r.Get("/ws", websocket.GlobalHub.HandleWebSocket)
+
+	// Admin — redirect to home
+	r.Get("/admin", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/", http.StatusMovedPermanently)
+	})
 
 	return r
 }
 
-// SpaHandler — faqat public status sahifasini serve qiladi
+// SpaHandler — public sahifani serve qiladi, cache-busting bilan
 func SpaHandler(publicDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/api/") {
 			http.NotFound(w, r)
 			return
 		}
+		// Cache-busting headers
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
 		http.ServeFile(w, r, publicDir+"/public/index.html")
 	}
 }

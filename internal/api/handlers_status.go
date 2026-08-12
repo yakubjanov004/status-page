@@ -5,14 +5,13 @@ import (
 	"log"
 	"net/http"
 	"status-page/internal/db"
+	"strings"
 	"time"
 )
 
-// ---- Response types ----
-
 type PublicStatusResponse struct {
 	Projects []PublicProjectData `json:"projects"`
-	Status   string              `json:"status"` // "All Systems Operational" | "Partial Outage" | "Major Outage"
+	Status   string             `json:"status"`
 }
 
 type PublicProjectData struct {
@@ -22,11 +21,11 @@ type PublicProjectData struct {
 }
 
 type ComponentData struct {
-	Name      string        `json:"name"`      // "Frontend", "Backend", "Bot", ...
-	Type      string        `json:"type"`      // component_type from DB
+	Name      string        `json:"name"`
+	Type      string        `json:"type"`
 	IsUp      bool          `json:"is_up"`
 	UptimePct float64       `json:"uptime_pct"`
-	History   []DailyStatus `json:"history"` // 7 kunlik
+	History   []DailyStatus `json:"history"`
 }
 
 type DailyStatus struct {
@@ -34,122 +33,89 @@ type DailyStatus struct {
 	IsUp bool   `json:"is_up"`
 }
 
-// ---- Handler ----
-
 func GetPublicStatusHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("[STATUS] Public status requested")
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 
-	// 1. Loyihalarni olish
+	// 1. Loyihalar
 	rows, err := db.DB.Query(`SELECT id, name, slug FROM projects WHERE show_on_public_page = 1 ORDER BY id`)
 	if err != nil {
-		log.Printf("[STATUS] ERROR querying projects: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("[STATUS] ERROR projects: %v", err)
+		json.NewEncoder(w).Encode(PublicStatusResponse{Projects: []PublicProjectData{}, Status: "Error"})
 		return
 	}
 	defer rows.Close()
 
-	projectsMap := make(map[int]*PublicProjectData)
-	var projectOrder []int
+	type projInfo struct {
+		data  PublicProjectData
+		slug  string
+	}
+	var projectList []projInfo
 
 	for rows.Next() {
-		var p PublicProjectData
-		var slug string
-		if err := rows.Scan(&p.ID, &p.Name, &slug); err != nil {
-			log.Printf("[STATUS] ERROR scanning project: %v", err)
+		var p projInfo
+		if err := rows.Scan(&p.data.ID, &p.data.Name, &p.slug); err != nil {
 			continue
 		}
-		p.Components = []ComponentData{}
-		projectsMap[p.ID] = &p
-		projectOrder = append(projectOrder, p.ID)
+		p.data.Components = []ComponentData{}
+		projectList = append(projectList, p)
 	}
-	log.Printf("[STATUS] Loaded %d projects", len(projectsMap))
 
-	// 2. Monitorlarni olish
+	// 2. Monitorlar
 	monitors, err := db.GetAllMonitors()
 	if err != nil {
-		log.Printf("[STATUS] ERROR getting monitors: %v", err)
+		log.Printf("[STATUS] ERROR monitors: %v", err)
 	}
-	log.Printf("[STATUS] Loaded %d monitors", len(monitors))
 
-	allUp := true
+	anyDown := false
 
 	for _, m := range monitors {
 		if m.ProjectID == nil || !m.ShowOnPublicPage {
-			log.Printf("[STATUS]   SKIP monitor id=%d (no project or not public)", m.ID)
 			continue
 		}
-		proj, exists := projectsMap[*m.ProjectID]
-		if !exists {
-			log.Printf("[STATUS]   SKIP monitor id=%d (project %d not found)", m.ID, *m.ProjectID)
+
+		// Bu monitor qaysi loyihaga tegishli?
+		var projIdx int = -1
+		for i, p := range projectList {
+			if p.data.ID == *m.ProjectID {
+				projIdx = i
+				break
+			}
+		}
+		if projIdx == -1 {
 			continue
+		}
+
+		// Eng oxirgi heartbeat — hozirgi status
+		var isCurrentlyUp bool = true
+		err := db.DB.QueryRow(
+			`SELECT is_up FROM heartbeats WHERE monitor_id = ? ORDER BY checked_at DESC LIMIT 1`,
+			m.ID,
+		).Scan(&isCurrentlyUp)
+		if err != nil {
+			// Hali heartbeat yo'q — unknown status, default true
+			isCurrentlyUp = true
+		}
+
+		if !isCurrentlyUp {
+			anyDown = true
 		}
 
 		// 7 kunlik history
-		histRows, err := db.DB.Query(`
-			SELECT is_up, date(checked_at) as day
-			FROM heartbeats
-			WHERE monitor_id = ? AND checked_at >= date('now', '-7 days')
-			ORDER BY checked_at DESC
-		`, m.ID)
+		history := buildHistory(m.ID)
 
-		var rawHistory []DailyStatus
-		if err == nil {
-			for histRows.Next() {
-				var d DailyStatus
-				if err := histRows.Scan(&d.IsUp, &d.Date); err == nil {
-					rawHistory = append(rawHistory, d)
-				}
-			}
-			histRows.Close()
-		}
-
-		// Kunlar bo'yicha aggregate
-		dailyMap := make(map[string]bool)
-		for _, rh := range rawHistory {
-			if cur, ok := dailyMap[rh.Date]; ok {
-				if !rh.IsUp {
-					dailyMap[rh.Date] = false
-				} else {
-					dailyMap[rh.Date] = cur
-				}
-			} else {
-				dailyMap[rh.Date] = rh.IsUp
+		// Uptime %
+		upDays := 0
+		for _, d := range history {
+			if d.IsUp {
+				upDays++
 			}
 		}
+		uptimePct := float64(upDays) / float64(len(history)) * 100.0
 
-		// So'nggi 7 kun
-		var history []DailyStatus
-		upCount := 0
-		for i := 6; i >= 0; i-- {
-			dateStr := time.Now().AddDate(0, 0, -i).Format("2006-01-02")
-			isUp := true
-			if val, ok := dailyMap[dateStr]; ok {
-				isUp = val
-			}
-			if isUp {
-				upCount++
-			}
-			history = append(history, DailyStatus{Date: dateStr, IsUp: isUp})
-		}
-		uptimePct := float64(upCount) / 7.0 * 100.0
+		compName := strings.ToUpper(m.ComponentType[:1]) + m.ComponentType[1:]
 
-		// Hozirgi status (eng oxirgi heartbeat)
-		isCurrentlyUp := true
-		if len(rawHistory) > 0 {
-			isCurrentlyUp = rawHistory[0].IsUp
-		}
-		if !isCurrentlyUp {
-			allUp = false
-		}
-
-		// Component nomi
-		compName := capitalize(m.ComponentType)
-		if compName == "" {
-			compName = "Service"
-		}
-
-		proj.Components = append(proj.Components, ComponentData{
+		projectList[projIdx].data.Components = append(projectList[projIdx].data.Components, ComponentData{
 			Name:      compName,
 			Type:      m.ComponentType,
 			IsUp:      isCurrentlyUp,
@@ -158,40 +124,57 @@ func GetPublicStatusHandler(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	// 3. Response yasash
-	response := PublicStatusResponse{}
-	for _, id := range projectOrder {
-		if p, ok := projectsMap[id]; ok {
-			response.Projects = append(response.Projects, *p)
-		}
-	}
-	if response.Projects == nil {
-		response.Projects = []PublicProjectData{}
+	// 3. Response
+	response := PublicStatusResponse{Projects: []PublicProjectData{}}
+	for _, p := range projectList {
+		response.Projects = append(response.Projects, p.data)
 	}
 
-	downCount := 0
-	for _, p := range response.Projects {
-		for _, c := range p.Components {
-			if !c.IsUp {
-				downCount++
+	if anyDown {
+		// Nechta down ekanini tekshiramiz
+		downCount := 0
+		totalCount := 0
+		for _, p := range response.Projects {
+			for _, c := range p.Components {
+				totalCount++
+				if !c.IsUp {
+					downCount++
+				}
 			}
 		}
-	}
-	if allUp || downCount == 0 {
-		response.Status = "All Systems Operational"
-	} else if downCount > 2 {
-		response.Status = "Major Outage"
+		if downCount >= totalCount/2 {
+			response.Status = "Major Outage"
+		} else {
+			response.Status = "Partial Outage"
+		}
 	} else {
-		response.Status = "Partial Outage"
+		response.Status = "All Systems Operational"
 	}
 
-	log.Printf("[STATUS] Response: %d projects, status=%s", len(response.Projects), response.Status)
 	json.NewEncoder(w).Encode(response)
 }
 
-func capitalize(s string) string {
-	if s == "" {
-		return s
+func buildHistory(monitorID int) []DailyStatus {
+	var history []DailyStatus
+
+	// 7 kun — har bir kun uchun eng yomon natijani olamiz
+	for i := 6; i >= 0; i-- {
+		dateStr := time.Now().AddDate(0, 0, -i).Format("2006-01-02")
+
+		var totalChecks, downChecks int
+		db.DB.QueryRow(`
+			SELECT COUNT(*), COALESCE(SUM(CASE WHEN is_up = 0 THEN 1 ELSE 0 END), 0)
+			FROM heartbeats
+			WHERE monitor_id = ? AND date(checked_at) = ?
+		`, monitorID, dateStr).Scan(&totalChecks, &downChecks)
+
+		isUp := true
+		if totalChecks > 0 && downChecks > 0 {
+			isUp = false // Agar 1 ta ham down bo'lsa, kun qizil
+		}
+
+		history = append(history, DailyStatus{Date: dateStr, IsUp: isUp})
 	}
-	return string([]byte{s[0] - 32}) + s[1:]
+
+	return history
 }
