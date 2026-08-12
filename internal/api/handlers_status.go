@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"status-page/internal/db"
 	"strings"
@@ -25,12 +24,14 @@ type ComponentData struct {
 	Type      string        `json:"type"`
 	IsUp      bool          `json:"is_up"`
 	UptimePct float64       `json:"uptime_pct"`
+	Latency   int           `json:"latency"`
 	History   []DailyStatus `json:"history"`
 }
 
 type DailyStatus struct {
-	Date string `json:"date"`
-	IsUp bool   `json:"is_up"`
+	Date  string  `json:"date"`
+	IsUp  bool    `json:"is_up"`
+	Pct   float64 `json:"pct"` // Kun ichidagi uptime %
 }
 
 func GetPublicStatusHandler(w http.ResponseWriter, r *http.Request) {
@@ -40,21 +41,20 @@ func GetPublicStatusHandler(w http.ResponseWriter, r *http.Request) {
 	// 1. Loyihalar
 	rows, err := db.DB.Query(`SELECT id, name, slug FROM projects WHERE show_on_public_page = 1 ORDER BY id`)
 	if err != nil {
-		log.Printf("[STATUS] ERROR projects: %v", err)
 		json.NewEncoder(w).Encode(PublicStatusResponse{Projects: []PublicProjectData{}, Status: "Error"})
 		return
 	}
 	defer rows.Close()
 
 	type projInfo struct {
-		data  PublicProjectData
-		slug  string
+		data PublicProjectData
 	}
 	var projectList []projInfo
 
 	for rows.Next() {
 		var p projInfo
-		if err := rows.Scan(&p.data.ID, &p.data.Name, &p.slug); err != nil {
+		var slug string
+		if err := rows.Scan(&p.data.ID, &p.data.Name, &slug); err != nil {
 			continue
 		}
 		p.data.Components = []ComponentData{}
@@ -64,18 +64,20 @@ func GetPublicStatusHandler(w http.ResponseWriter, r *http.Request) {
 	// 2. Monitorlar
 	monitors, err := db.GetAllMonitors()
 	if err != nil {
-		log.Printf("[STATUS] ERROR monitors: %v", err)
+		monitors = nil
 	}
 
-	anyDown := false
+	// Kuma uslubida overall status
+	hasUp := false
+	hasDown := false
 
 	for _, m := range monitors {
 		if m.ProjectID == nil || !m.ShowOnPublicPage {
 			continue
 		}
 
-		// Bu monitor qaysi loyihaga tegishli?
-		var projIdx int = -1
+		// Loyiha index topamiz
+		projIdx := -1
 		for i, p := range projectList {
 			if p.data.ID == *m.ProjectID {
 				projIdx = i
@@ -87,31 +89,40 @@ func GetPublicStatusHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Eng oxirgi heartbeat — hozirgi status
-		var isCurrentlyUp bool = true
+		var isCurrentlyUp bool
+		var latency int
 		err := db.DB.QueryRow(
-			`SELECT is_up FROM heartbeats WHERE monitor_id = ? ORDER BY checked_at DESC LIMIT 1`,
+			`SELECT is_up, response_time_ms FROM heartbeats WHERE monitor_id = ? ORDER BY checked_at DESC LIMIT 1`,
 			m.ID,
-		).Scan(&isCurrentlyUp)
+		).Scan(&isCurrentlyUp, &latency)
 		if err != nil {
-			// Hali heartbeat yo'q — unknown status, default true
-			isCurrentlyUp = true
+			isCurrentlyUp = true // Hali heartbeat yo'q
+			latency = 0
 		}
 
-		if !isCurrentlyUp {
-			anyDown = true
+		if isCurrentlyUp {
+			hasUp = true
+		} else {
+			hasDown = true
 		}
 
-		// 7 kunlik history
+		// 7 kunlik history — heartbeat based uptime %
 		history := buildHistory(m.ID)
 
-		// Uptime %
-		upDays := 0
-		for _, d := range history {
-			if d.IsUp {
-				upDays++
-			}
+		// Umumiy uptime % (7 kun)
+		var totalUp, totalChecks int
+		db.DB.QueryRow(`
+			SELECT 
+				COALESCE(SUM(CASE WHEN is_up = 1 THEN 1 ELSE 0 END), 0),
+				COUNT(*)
+			FROM heartbeats
+			WHERE monitor_id = ? AND checked_at >= datetime('now', '-7 days')
+		`, m.ID).Scan(&totalUp, &totalChecks)
+
+		uptimePct := 100.0
+		if totalChecks > 0 {
+			uptimePct = float64(totalUp) / float64(totalChecks) * 100.0
 		}
-		uptimePct := float64(upDays) / float64(len(history)) * 100.0
 
 		compName := strings.ToUpper(m.ComponentType[:1]) + m.ComponentType[1:]
 
@@ -120,34 +131,23 @@ func GetPublicStatusHandler(w http.ResponseWriter, r *http.Request) {
 			Type:      m.ComponentType,
 			IsUp:      isCurrentlyUp,
 			UptimePct: uptimePct,
+			Latency:   latency,
 			History:   history,
 		})
 	}
 
-	// 3. Response
+	// 3. Response — Kuma overallStatus logikasi
 	response := PublicStatusResponse{Projects: []PublicProjectData{}}
 	for _, p := range projectList {
 		response.Projects = append(response.Projects, p.data)
 	}
 
-	if anyDown {
-		// Nechta down ekanini tekshiramiz
-		downCount := 0
-		totalCount := 0
-		for _, p := range response.Projects {
-			for _, c := range p.Components {
-				totalCount++
-				if !c.IsUp {
-					downCount++
-				}
-			}
-		}
-		if downCount >= totalCount/2 {
-			response.Status = "Major Outage"
-		} else {
-			response.Status = "Partial Outage"
-		}
-	} else {
+	switch {
+	case hasDown && hasUp:
+		response.Status = "Partially Degraded Service"
+	case hasDown && !hasUp:
+		response.Status = "Major Outage"
+	default:
 		response.Status = "All Systems Operational"
 	}
 
@@ -156,24 +156,28 @@ func GetPublicStatusHandler(w http.ResponseWriter, r *http.Request) {
 
 func buildHistory(monitorID int) []DailyStatus {
 	var history []DailyStatus
+	now := time.Now().UTC()
 
-	// 7 kun — har bir kun uchun eng yomon natijani olamiz
 	for i := 6; i >= 0; i-- {
-		dateStr := time.Now().AddDate(0, 0, -i).Format("2006-01-02")
+		dateStr := now.AddDate(0, 0, -i).Format("2006-01-02")
 
-		var totalChecks, downChecks int
+		var totalChecks, upChecks int
 		db.DB.QueryRow(`
-			SELECT COUNT(*), COALESCE(SUM(CASE WHEN is_up = 0 THEN 1 ELSE 0 END), 0)
+			SELECT COUNT(*), COALESCE(SUM(CASE WHEN is_up = 1 THEN 1 ELSE 0 END), 0)
 			FROM heartbeats
 			WHERE monitor_id = ? AND date(checked_at) = ?
-		`, monitorID, dateStr).Scan(&totalChecks, &downChecks)
+		`, monitorID, dateStr).Scan(&totalChecks, &upChecks)
 
 		isUp := true
-		if totalChecks > 0 && downChecks > 0 {
-			isUp = false // Agar 1 ta ham down bo'lsa, kun qizil
+		pct := 100.0
+		if totalChecks > 0 {
+			pct = float64(upChecks) / float64(totalChecks) * 100.0
+			if pct < 100.0 {
+				isUp = false
+			}
 		}
 
-		history = append(history, DailyStatus{Date: dateStr, IsUp: isUp})
+		history = append(history, DailyStatus{Date: dateStr, IsUp: isUp, Pct: pct})
 	}
 
 	return history

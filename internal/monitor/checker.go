@@ -9,15 +9,19 @@ import (
 	"time"
 )
 
+// Check — Kuma uslubida: default DOWN, muvaffaqiyatli bo'lsa UP
 func Check(m *models.Monitor) *models.Heartbeat {
 	hb := &models.Heartbeat{
 		MonitorID: m.ID,
-		CheckedAt: time.Now(),
-		IsUp:      false,
+		CheckedAt: time.Now().UTC(), // Doimo UTC!
+		IsUp:      false,            // Default: DOWN (Kuma kabi)
 	}
 
 	start := time.Now()
 	timeout := time.Duration(m.TimeoutSeconds) * time.Second
+	if timeout <= 0 {
+		timeout = 10 * time.Second
+	}
 
 	switch m.Type {
 	case "http":
@@ -26,16 +30,22 @@ func Check(m *models.Monitor) *models.Heartbeat {
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			},
+			// Redirect qilmasin — faqat birinchi response ni olamiz
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				if len(via) >= 10 {
+					return http.ErrUseLastResponse
+				}
+				return nil
+			},
 		}
-		
+
 		url := m.URL
 		if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
 			url = "http://" + url
 		}
 
 		resp, err := client.Get(url)
-		duration := time.Since(start).Milliseconds()
-		hb.Latency = int(duration)
+		hb.Latency = int(time.Since(start).Milliseconds())
 
 		if err != nil {
 			hb.Message = err.Error()
@@ -44,16 +54,26 @@ func Check(m *models.Monitor) *models.Heartbeat {
 		defer resp.Body.Close()
 
 		hb.StatusCode = resp.StatusCode
-		if resp.StatusCode == m.ExpectedStatusCode {
-			hb.IsUp = true
+
+		// Status code tekshirish: 200-399 oraligi muvaffaqiyatli
+		if m.ExpectedStatusCode > 0 {
+			if resp.StatusCode == m.ExpectedStatusCode {
+				hb.IsUp = true
+			} else {
+				hb.Message = "Unexpected status code"
+			}
 		} else {
-			hb.Message = "Unexpected status code"
+			// Default: 200-399 = UP
+			if resp.StatusCode >= 200 && resp.StatusCode < 400 {
+				hb.IsUp = true
+			} else {
+				hb.Message = "Unexpected status code"
+			}
 		}
 
 	case "tcp":
 		conn, err := net.DialTimeout("tcp", m.URL, timeout)
-		duration := time.Since(start).Milliseconds()
-		hb.Latency = int(duration)
+		hb.Latency = int(time.Since(start).Milliseconds())
 
 		if err != nil {
 			hb.Message = err.Error()
@@ -61,11 +81,6 @@ func Check(m *models.Monitor) *models.Heartbeat {
 		}
 		conn.Close()
 		hb.IsUp = true
-
-	case "ping":
-		// Simple ping could be implemented, but for simplicity, we treat TCP dial on port 80/443 or similar as ping if it's an IP
-		// In a real scenario, ICMP ping requires root privileges or raw sockets
-		hb.Message = "Ping type is not fully implemented yet, use TCP or HTTP"
 	}
 
 	return hb
