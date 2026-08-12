@@ -6,6 +6,7 @@ import (
 	"status-page/internal/api"
 	"status-page/internal/config"
 	"status-page/internal/db"
+	"status-page/internal/discovery"
 	"status-page/internal/models"
 	"status-page/internal/monitor"
 	"status-page/internal/websocket"
@@ -17,6 +18,9 @@ func main() {
 	if err := db.Init(cfg.DBPath); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
+
+	// Birinchi ishga tushishda Nginx+Systemd skanerlab loyihalarni avtomatik qo'shadi
+	discovery.AutoSeed()
 
 	scheduler := monitor.InitScheduler()
 	
