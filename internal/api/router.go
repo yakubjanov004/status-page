@@ -1,8 +1,10 @@
 package api
 
 import (
+	"net/http"
 	"status-page/internal/config"
 	"status-page/internal/websocket"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -15,37 +17,27 @@ func NewRouter(cfg *config.Config) *chi.Mux {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"*"}, // Adjust in prod
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
+		AllowedOrigins: []string{"*"},
+		AllowedMethods: []string{"GET", "OPTIONS"},
+		AllowedHeaders: []string{"Accept", "Content-Type"},
 	}))
 
-	r.Route("/api", func(r chi.Router) {
-		r.Post("/auth/login", LoginHandler(cfg))
-		r.Post("/auth/logout", LogoutHandler())
-		r.Get("/auth/check", CheckAuthHandler(cfg))
+	// Faqat public API — admin panel yo'q
+	r.Get("/api/public/status", GetPublicStatusHandler)
 
-		r.Get("/public/status", GetPublicStatusHandler)
-
-		// Protected routes
-		r.Group(func(r chi.Router) {
-			r.Use(AuthMiddleware(cfg))
-			
-			r.Get("/monitors", GetMonitorsHandler)
-			r.Post("/monitors", CreateMonitorHandler)
-			r.Put("/monitors/{id}", UpdateMonitorHandler)
-			r.Delete("/monitors/{id}", DeleteMonitorHandler)
-			r.Get("/monitors/{id}/history", GetMonitorHistoryHandler)
-			
-			r.Get("/projects", GetProjectsHandler)
-			r.Post("/projects", CreateProjectHandler)
-			
-			r.Get("/discovery/scan", ScanDiscoveryHandler)
-			r.Post("/discovery/add", AddDiscoveredProjectHandler)
-		})
-	})
-
+	// WebSocket — real-time yangilanishlar
 	r.Get("/ws", websocket.GlobalHub.HandleWebSocket)
 
 	return r
+}
+
+// SpaHandler — faqat public status sahifasini serve qiladi
+func SpaHandler(publicDir string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			http.NotFound(w, r)
+			return
+		}
+		http.ServeFile(w, r, publicDir+"/public/index.html")
+	}
 }

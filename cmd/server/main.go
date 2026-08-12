@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+
 	"status-page/internal/api"
 	"status-page/internal/config"
 	"status-page/internal/db"
@@ -19,23 +20,21 @@ func main() {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 
-	// Birinchi ishga tushishda Nginx+Systemd skanerlab loyihalarni avtomatik qo'shadi
+	// Nginx va Systemd fayllaridan loyihalarni avtomatik qo'shadi
 	discovery.AutoSeed()
 
+	// Monitorlarni yoqamiz
 	scheduler := monitor.InitScheduler()
-	
-	// Push update to websocket when a check finishes
 	scheduler.OnUpdate = func(hb *models.Heartbeat) {
 		websocket.GlobalHub.Broadcast("heartbeat_update", hb)
 	}
-	
 	scheduler.StartAll()
 
+	// Eski heartbeatlarni tozalash
 	db.StartCleanupJob()
 
+	// Router — faqat public API va WebSocket
 	r := api.NewRouter(cfg)
-
-	// Serve Static Files
 	r.NotFound(api.SpaHandler("./web"))
 
 	log.Printf("Server starting on port %s", cfg.Port)

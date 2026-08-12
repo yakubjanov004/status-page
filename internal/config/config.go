@@ -1,8 +1,6 @@
 package config
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"log"
 	"os"
 
@@ -10,11 +8,8 @@ import (
 )
 
 type Config struct {
-	Port          string
-	DBPath        string
-	AdminUsername string
-	AdminPassword string
-	SessionSecret string
+	Port   string
+	DBPath string
 }
 
 func Load() *Config {
@@ -33,30 +28,8 @@ func Load() *Config {
 		dbPath = "./data/status.db"
 	}
 
-	adminUser := os.Getenv("ADMIN_USERNAME")
-	if adminUser == "" {
-		adminUser = "admin"
-	}
-
-	adminPass := os.Getenv("ADMIN_PASSWORD")
-	if adminPass == "" {
-		adminPass = "admin"
-	}
-
 	return &Config{
-		Port:          port,
-		DBPath:        dbPath,
-		AdminUsername: adminUser,
-		AdminPassword: adminPass,
-		SessionSecret: generateSessionSecret(),
+		Port:   port,
+		DBPath: dbPath,
 	}
-}
-
-func generateSessionSecret() string {
-	b := make([]byte, 32)
-	_, err := rand.Read(b)
-	if err != nil {
-		return "fallback-secret-for-errors-only-12345"
-	}
-	return base64.StdEncoding.EncodeToString(b)
 }

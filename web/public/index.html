@@ -4,218 +4,282 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>System Status</title>
+    <meta name="description" content="Real-time system status and uptime monitoring">
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        * { box-sizing: border-box; }
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #0f172a;
-            color: #f8fafc;
-        }
-        .history-bar {
-            width: 14%; /* Roughly 1/7th minus gap */
-            height: 36px;
-            border-radius: 4px;
-            transition: all 0.2s ease;
-        }
-        .history-bar:hover {
-            transform: scaleY(1.1);
-            filter: brightness(1.2);
-        }
-        .bar-up { background-color: #10b981; }
-        .bar-down { background-color: #ef4444; }
-        .bar-empty { background-color: #334155; }
-        
-        .pulse-green {
-            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
-            animation: pulse-green 2s infinite;
-        }
-        .pulse-red {
-            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
-            animation: pulse-red 2s infinite;
+            background: #080d1a;
+            color: #e2e8f0;
+            min-height: 100vh;
         }
 
-        @keyframes pulse-green {
-            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
-            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        /* Animated gradient background */
+        .bg-gradient-anim {
+            background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99,102,241,0.15), transparent),
+                        radial-gradient(ellipse 60% 40% at 80% 80%, rgba(16,185,129,0.05), transparent);
         }
-        @keyframes pulse-red {
-            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
-            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+
+        /* Glass card */
+        .glass {
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255,255,255,0.07);
         }
-        
-        .glass-panel {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+        .glass:hover {
+            border-color: rgba(255,255,255,0.12);
+            background: rgba(15, 23, 42, 0.85);
         }
+
+        /* Status banner */
+        .banner-up   { border-color: rgba(16,185,129,0.35); background: rgba(16,185,129,0.06); }
+        .banner-down { border-color: rgba(239,68,68,0.35);  background: rgba(239,68,68,0.06); }
+
+        /* Pulse dots */
+        .dot-up   { background: #10b981; box-shadow: 0 0 0 0 rgba(16,185,129,0.6); animation: pulse-up   2s infinite; }
+        .dot-down { background: #ef4444; box-shadow: 0 0 0 0 rgba(239,68,68,0.6);  animation: pulse-down 2s infinite; }
+        .dot-warn { background: #f59e0b; box-shadow: 0 0 0 0 rgba(245,158,11,0.6); animation: pulse-warn 2s infinite; }
+
+        @keyframes pulse-up   { 70% { box-shadow: 0 0 0 8px rgba(16,185,129,0); } 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); } }
+        @keyframes pulse-down { 70% { box-shadow: 0 0 0 8px rgba(239,68,68,0); }  100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); } }
+        @keyframes pulse-warn { 70% { box-shadow: 0 0 0 8px rgba(245,158,11,0); } 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); } }
+
+        /* History bars */
+        .bar {
+            flex: 1;
+            height: 32px;
+            border-radius: 4px;
+            transition: transform 0.15s, filter 0.15s;
+            cursor: default;
+            min-width: 0;
+        }
+        .bar:hover { transform: scaleY(1.12); filter: brightness(1.3); }
+        .bar-up    { background: #10b981; }
+        .bar-down  { background: #ef4444; }
+        .bar-empty { background: rgba(51,65,85,0.6); }
+
+        /* Component tag */
+        .tag { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; }
+        .tag-up   { background: rgba(16,185,129,0.15); color: #34d399; }
+        .tag-down { background: rgba(239,68,68,0.15);  color: #f87171; }
+
+        /* Skeleton shimmer */
+        @keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
+        .skeleton {
+            background: linear-gradient(90deg, rgba(30,41,59,0.8) 25%, rgba(51,65,85,0.5) 50%, rgba(30,41,59,0.8) 75%);
+            background-size: 400px 100%;
+            animation: shimmer 1.4s infinite;
+            border-radius: 8px;
+        }
+
+        /* Uptime badge */
+        .uptime-up   { color: #34d399; }
+        .uptime-down { color: #f87171; }
+
+        /* Fade in */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+        .fade-in { animation: fadeIn 0.3s ease forwards; }
     </style>
 </head>
-<body class="antialiased min-h-screen flex flex-col" x-data="statusPage()">
+<body class="bg-gradient-anim" x-data="statusPage()" x-init="init()">
 
-    <header class="w-full py-6 px-4 md:px-8 flex justify-between items-center border-b border-slate-800">
+    <!-- Header -->
+    <header class="w-full py-5 px-6 md:px-10 flex items-center border-b border-white/5">
         <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/50">
-                S
-            </div>
-            <h1 class="text-xl font-bold tracking-tight">Status</h1>
+            <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center font-extrabold text-white text-lg shadow-lg shadow-indigo-600/40">S</div>
+            <span class="text-lg font-bold tracking-tight text-slate-100">Status</span>
         </div>
-        <a href="/admin" class="text-sm text-slate-400 hover:text-white transition-colors">Admin Area</a>
+        <div class="ml-auto flex items-center gap-2 text-xs text-slate-500">
+            <span class="w-2 h-2 rounded-full inline-block" :class="wsConnected ? 'bg-emerald-500' : 'bg-slate-600'"></span>
+            <span x-text="wsConnected ? 'Live' : 'Connecting...'"></span>
+        </div>
     </header>
 
-    <main class="flex-grow max-w-4xl w-full mx-auto px-4 py-12">
-        
-        <!-- Status Banner -->
-        <div class="mb-12 rounded-2xl p-6 glass-panel flex items-center justify-between"
-             :class="isAllUp() ? 'border-emerald-500/30' : 'border-red-500/30'">
-            <div class="flex items-center gap-4">
-                <div class="w-4 h-4 rounded-full" 
-                     :class="isAllUp() ? 'bg-emerald-500 pulse-green' : 'bg-red-500 pulse-red'"></div>
-                <h2 class="text-2xl font-bold" x-text="data.status || 'Loading...'"></h2>
-            </div>
-            <div class="text-slate-400 text-sm">
-                Updated just now
-            </div>
-        </div>
+    <main class="max-w-3xl mx-auto px-4 py-10 space-y-8">
 
-        <!-- Project List -->
-        <div class="space-y-8">
-            <template x-for="project in data.projects" :key="project.id">
-                <div class="glass-panel rounded-xl p-6 transition-all hover:bg-slate-800/80">
-                    <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-xl font-bold flex items-center gap-3" x-text="project.name"></h3>
-                        <div class="text-sm font-medium">
-                            <span class="px-2 py-1 rounded text-xs font-bold uppercase tracking-wide"
-                                  :class="getProjectStatusClass(project)"
-                                  x-text="getProjectStatusText(project)"></span>
+        <!-- Loading state -->
+        <template x-if="loading">
+            <div class="space-y-4">
+                <div class="skeleton h-20 w-full"></div>
+                <div class="skeleton h-40 w-full"></div>
+                <div class="skeleton h-40 w-full"></div>
+                <div class="skeleton h-40 w-full"></div>
+            </div>
+        </template>
+
+        <!-- Loaded state -->
+        <template x-if="!loading">
+            <div class="space-y-6 fade-in">
+
+                <!-- Global Status Banner -->
+                <div class="glass rounded-2xl px-6 py-5 flex items-center justify-between transition-all duration-500"
+                     :class="overallDotClass === 'dot-up' ? 'banner-up' : 'banner-down'">
+                    <div class="flex items-center gap-4">
+                        <div class="w-4 h-4 rounded-full flex-shrink-0" :class="overallDotClass"></div>
+                        <div>
+                            <div class="text-xl font-bold text-white" x-text="data.status || '—'"></div>
+                            <div class="text-xs text-slate-400 mt-0.5" x-text="lastUpdated"></div>
                         </div>
                     </div>
-                    
-                    <div class="space-y-6">
-                        <!-- Frontend Component -->
-                        <template x-if="project.frontend">
-                            <div class="pl-4 border-l-2 border-slate-700">
-                                <div class="flex justify-between items-center mb-2">
-                                    <h4 class="text-slate-300 font-medium">Frontend</h4>
-                                    <div class="text-sm" :class="project.frontend.is_up ? 'text-emerald-400' : 'text-red-400'">
-                                        <span x-text="project.frontend.uptime_pct.toFixed(2) + '%'"></span> uptime
-                                    </div>
-                                </div>
-                                <div class="flex items-end justify-between mt-2 overflow-hidden h-10 w-full gap-1">
-                                    <template x-for="day in project.frontend.history">
-                                        <div class="flex-grow history-bar"
-                                             :class="day.is_up ? 'bar-up' : 'bar-down'"
-                                             :title="day.date + ' - ' + (day.is_up ? 'Operational' : 'Outage')">
-                                        </div>
-                                    </template>
-                                </div>
-                            </div>
-                        </template>
-
-                        <!-- Backend Component -->
-                        <template x-if="project.backend">
-                            <div class="pl-4 border-l-2 border-slate-700">
-                                <div class="flex justify-between items-center mb-2">
-                                    <h4 class="text-slate-300 font-medium">Backend</h4>
-                                    <div class="text-sm" :class="project.backend.is_up ? 'text-emerald-400' : 'text-red-400'">
-                                        <span x-text="project.backend.uptime_pct.toFixed(2) + '%'"></span> uptime
-                                    </div>
-                                </div>
-                                <div class="flex items-end justify-between mt-2 overflow-hidden h-10 w-full gap-1">
-                                    <template x-for="day in project.backend.history">
-                                        <div class="flex-grow history-bar"
-                                             :class="day.is_up ? 'bar-up' : 'bar-down'"
-                                             :title="day.date + ' - ' + (day.is_up ? 'Operational' : 'Outage')">
-                                        </div>
-                                    </template>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
-
-                    <div class="flex justify-between text-xs text-slate-500 mt-4 pt-4 border-t border-slate-800">
-                        <span>7 days ago</span>
-                        <span>Today</span>
+                    <div class="text-xs text-slate-500 hidden sm:block">
+                        <span x-text="data.projects ? data.projects.length + ' projects' : ''"></span>
                     </div>
                 </div>
-            </template>
-            
-            <div x-show="data.projects && data.projects.length === 0" class="text-center py-12 text-slate-500">
-                No projects configured yet.
+
+                <!-- No projects -->
+                <template x-if="data.projects && data.projects.length === 0">
+                    <div class="glass rounded-2xl px-6 py-16 text-center text-slate-500">
+                        <div class="text-4xl mb-3">📡</div>
+                        <div class="font-medium">No projects found</div>
+                        <div class="text-sm mt-1">Set DISCOVERY_NGINX_DIR and DISCOVERY_SYSTEMD_DIR in .env</div>
+                    </div>
+                </template>
+
+                <!-- Project Cards -->
+                <template x-for="(project, pi) in data.projects" :key="project.id">
+                    <div class="glass rounded-2xl overflow-hidden transition-all duration-200 fade-in">
+
+                        <!-- Project Header -->
+                        <div class="px-6 py-4 flex items-center justify-between border-b border-white/5">
+                            <div class="flex items-center gap-3">
+                                <div class="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                                     :class="projectIsUp(project) ? 'bg-emerald-500' : 'bg-red-500'"></div>
+                                <h3 class="font-bold text-white text-base" x-text="project.name"></h3>
+                            </div>
+                            <span class="tag" :class="projectIsUp(project) ? 'tag-up' : 'tag-down'"
+                                  x-text="projectStatusText(project)"></span>
+                        </div>
+
+                        <!-- Components -->
+                        <div class="divide-y divide-white/5">
+                            <template x-for="(comp, ci) in project.components" :key="ci">
+                                <div class="px-6 py-4">
+                                    <div class="flex items-center justify-between mb-3">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-sm font-semibold text-slate-200" x-text="comp.name"></span>
+                                            <span class="text-xs px-1.5 py-0.5 rounded font-medium"
+                                                  :class="comp.is_up ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'"
+                                                  x-text="comp.is_up ? 'Operational' : 'Down'">
+                                            </span>
+                                        </div>
+                                        <span class="text-xs font-semibold tabular-nums"
+                                              :class="comp.uptime_pct >= 99 ? 'uptime-up' : (comp.uptime_pct >= 90 ? 'text-amber-400' : 'uptime-down')"
+                                              x-text="comp.uptime_pct.toFixed(1) + '% uptime'">
+                                        </span>
+                                    </div>
+
+                                    <!-- 7-day bars -->
+                                    <div class="flex gap-1 items-end">
+                                        <template x-for="(day, di) in comp.history" :key="di">
+                                            <div class="bar relative group"
+                                                 :class="day.is_up ? 'bar-up' : 'bar-down'">
+                                                <!-- Tooltip -->
+                                                <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-xs text-white rounded shadow-xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10"
+                                                     x-text="formatDate(day.date) + ' — ' + (day.is_up ? 'Up' : 'Down')">
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+
+                                    <!-- 7 days ago → Today -->
+                                    <div class="flex justify-between text-xs text-slate-600 mt-1.5">
+                                        <span>7 days ago</span>
+                                        <span>Today</span>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+
             </div>
-        </div>
+        </template>
+
     </main>
 
-    <footer class="w-full py-6 text-center text-sm text-slate-500 border-t border-slate-800">
+    <footer class="text-center text-xs text-slate-700 py-8">
         Powered by Self-Hosted Status Page
     </footer>
 
     <script>
         document.addEventListener('alpine:init', () => {
             Alpine.data('statusPage', () => ({
-                data: { projects: [], status: 'Loading...' },
+                data: { projects: [], status: '' },
+                loading: true,
+                wsConnected: false,
                 ws: null,
+                lastUpdated: 'Loading...',
 
                 init() {
                     this.fetchData();
                     this.connectWebSocket();
+                    // Fallback: har 30 soniyada yangilash
+                    setInterval(() => this.fetchData(), 30000);
                 },
 
                 async fetchData() {
                     try {
                         const res = await fetch('/api/public/status');
-                        const json = await res.json();
-                        this.data = json;
+                        if (!res.ok) throw new Error('HTTP ' + res.status);
+                        this.data = await res.json();
+                        this.lastUpdated = 'Updated ' + new Date().toLocaleTimeString();
                     } catch (e) {
-                        console.error('Failed to fetch status', e);
-                        this.data.status = 'Error fetching status';
+                        console.error('Fetch error:', e);
+                        this.data.status = 'Unable to load status';
+                        this.lastUpdated = 'Failed to update';
+                    } finally {
+                        this.loading = false;
                     }
                 },
 
                 connectWebSocket() {
-                    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                    this.ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
-                    
-                    this.ws.onmessage = (event) => {
-                        const msg = JSON.parse(event.data);
-                        if (msg.type === 'heartbeat_update') {
-                            this.fetchData(); 
-                        }
-                    };
-                    
+                    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+                    this.ws = new WebSocket(`${proto}//${location.host}/ws`);
+
+                    this.ws.onopen  = () => { this.wsConnected = true; };
                     this.ws.onclose = () => {
-                        setTimeout(() => this.connectWebSocket(), 3000);
+                        this.wsConnected = false;
+                        setTimeout(() => this.connectWebSocket(), 4000);
+                    };
+                    this.ws.onerror = () => { this.wsConnected = false; };
+                    this.ws.onmessage = (e) => {
+                        try {
+                            const msg = JSON.parse(e.data);
+                            if (msg.type === 'heartbeat_update') this.fetchData();
+                        } catch {}
                     };
                 },
 
-                isAllUp() {
-                    if (!this.data.projects) return true;
-                    for (const p of this.data.projects) {
-                        if (p.frontend && !p.frontend.is_up) return false;
-                        if (p.backend && !p.backend.is_up) return false;
-                    }
-                    return true;
+                get overallDotClass() {
+                    if (!this.data.projects || this.data.projects.length === 0) return 'dot-up';
+                    const allUp = this.data.projects.every(p =>
+                        !p.components || p.components.every(c => c.is_up)
+                    );
+                    return allUp ? 'dot-up' : 'dot-down';
                 },
 
-                getProjectStatusText(project) {
-                    let total = 0;
-                    let down = 0;
-                    if (project.frontend) { total++; if (!project.frontend.is_up) down++; }
-                    if (project.backend) { total++; if (!project.backend.is_up) down++; }
-                    
+                projectIsUp(project) {
+                    if (!project.components || project.components.length === 0) return true;
+                    return project.components.every(c => c.is_up);
+                },
+
+                projectStatusText(project) {
+                    if (!project.components || project.components.length === 0) return 'No Data';
+                    const down = project.components.filter(c => !c.is_up).length;
                     if (down === 0) return 'Operational';
-                    if (down === total) return 'Outage';
-                    return 'Partial Outage';
+                    if (down === project.components.length) return 'Outage';
+                    return 'Partial';
                 },
 
-                getProjectStatusClass(project) {
-                    const text = this.getProjectStatusText(project);
-                    if (text === 'Operational') return 'bg-emerald-500/20 text-emerald-400';
-                    if (text === 'Outage') return 'bg-red-500/20 text-red-400';
-                    return 'bg-amber-500/20 text-amber-400';
+                formatDate(dateStr) {
+                    try {
+                        return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                    } catch {
+                        return dateStr;
+                    }
                 }
             }));
         });

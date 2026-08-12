@@ -5,7 +5,7 @@ import "time"
 type Monitor struct {
 	ID                 int       `json:"id"`
 	Name               string    `json:"name"`
-	Type               string    `json:"type"` // "http", "tcp", "ping"
+	Type               string    `json:"type"` // "http", "tcp"
 	URL                string    `json:"url"`
 	IntervalSeconds    int       `json:"interval_seconds"`
 	TimeoutSeconds     int       `json:"timeout_seconds"`

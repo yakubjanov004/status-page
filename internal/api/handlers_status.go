@@ -8,173 +8,190 @@ import (
 	"time"
 )
 
+// ---- Response types ----
+
 type PublicStatusResponse struct {
 	Projects []PublicProjectData `json:"projects"`
-	Status   string              `json:"status"` // "All Systems Operational" or "Partial Outage"
+	Status   string              `json:"status"` // "All Systems Operational" | "Partial Outage" | "Major Outage"
 }
 
 type PublicProjectData struct {
-	ID          int               `json:"id"`
-	Name        string            `json:"name"`
-	Frontend    *ComponentStatus  `json:"frontend,omitempty"`
-	Backend     *ComponentStatus  `json:"backend,omitempty"`
+	ID         int             `json:"id"`
+	Name       string          `json:"name"`
+	Components []ComponentData `json:"components"`
 }
 
-type ComponentStatus struct {
-	IsUp       bool               `json:"is_up"`
-	UptimePct  float64            `json:"uptime_pct"`
-	History    []DailyHistory     `json:"history"` // 7 days
+type ComponentData struct {
+	Name      string        `json:"name"`      // "Frontend", "Backend", "Bot", ...
+	Type      string        `json:"type"`      // component_type from DB
+	IsUp      bool          `json:"is_up"`
+	UptimePct float64       `json:"uptime_pct"`
+	History   []DailyStatus `json:"history"` // 7 kunlik
 }
 
-type DailyHistory struct {
-	Date  string `json:"date"`
-	IsUp  bool   `json:"is_up"`
+type DailyStatus struct {
+	Date string `json:"date"`
+	IsUp bool   `json:"is_up"`
 }
+
+// ---- Handler ----
 
 func GetPublicStatusHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("[STATUS] Public status page requested")
+	log.Println("[STATUS] Public status requested")
+	w.Header().Set("Content-Type", "application/json")
 
-	// 1. Fetch projects
-	rows, err := db.DB.Query(`SELECT id, name, slug, description FROM projects WHERE show_on_public_page = 1`)
+	// 1. Loyihalarni olish
+	rows, err := db.DB.Query(`SELECT id, name, slug FROM projects WHERE show_on_public_page = 1 ORDER BY id`)
 	if err != nil {
-		log.Printf("[STATUS] ERROR: failed to query projects: %v", err)
+		log.Printf("[STATUS] ERROR querying projects: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
 
-	var projectsMap = make(map[int]*PublicProjectData)
-	var response PublicStatusResponse
-	response.Status = "All Systems Operational"
+	projectsMap := make(map[int]*PublicProjectData)
+	var projectOrder []int
 
 	for rows.Next() {
 		var p PublicProjectData
-		var slug, desc string
-		if err := rows.Scan(&p.ID, &p.Name, &slug, &desc); err != nil {
-			log.Printf("[STATUS] ERROR: failed to scan project row: %v", err)
+		var slug string
+		if err := rows.Scan(&p.ID, &p.Name, &slug); err != nil {
+			log.Printf("[STATUS] ERROR scanning project: %v", err)
 			continue
 		}
-		log.Printf("[STATUS] Found project: id=%d name=%s", p.ID, p.Name)
+		p.Components = []ComponentData{}
 		projectsMap[p.ID] = &p
+		projectOrder = append(projectOrder, p.ID)
 	}
-	log.Printf("[STATUS] Total projects loaded: %d", len(projectsMap))
+	log.Printf("[STATUS] Loaded %d projects", len(projectsMap))
 
-	// 2. Fetch monitors
+	// 2. Monitorlarni olish
 	monitors, err := db.GetAllMonitors()
 	if err != nil {
-		log.Printf("[STATUS] ERROR: failed to get monitors: %v", err)
+		log.Printf("[STATUS] ERROR getting monitors: %v", err)
 	}
-	log.Printf("[STATUS] Total monitors loaded: %d", len(monitors))
+	log.Printf("[STATUS] Loaded %d monitors", len(monitors))
+
 	allUp := true
 
 	for _, m := range monitors {
-		log.Printf("[STATUS] Monitor: id=%d name=%s project_id=%v component=%s show_public=%v",
-			m.ID, m.Name, m.ProjectID, m.ComponentType, m.ShowOnPublicPage)
-
 		if m.ProjectID == nil || !m.ShowOnPublicPage {
-			log.Printf("[STATUS]   -> SKIPPED (no project_id or not public)")
+			log.Printf("[STATUS]   SKIP monitor id=%d (no project or not public)", m.ID)
 			continue
 		}
 		proj, exists := projectsMap[*m.ProjectID]
 		if !exists {
-			log.Printf("[STATUS]   -> SKIPPED (project %d not found in public projects)", *m.ProjectID)
+			log.Printf("[STATUS]   SKIP monitor id=%d (project %d not found)", m.ID, *m.ProjectID)
 			continue
 		}
-		log.Printf("[STATUS]   -> Assigned to project '%s'", proj.Name)
 
-		// Fetch history for 7 days
-		// We'll fetch all within last 7 days and aggregate by day
-		historyRows, err := db.DB.Query(`
-			SELECT is_up, date(checked_at) as day 
-			FROM heartbeats 
+		// 7 kunlik history
+		histRows, err := db.DB.Query(`
+			SELECT is_up, date(checked_at) as day
+			FROM heartbeats
 			WHERE monitor_id = ? AND checked_at >= date('now', '-7 days')
 			ORDER BY checked_at DESC
 		`, m.ID)
-		
-		var rawHistory []DailyHistory
+
+		var rawHistory []DailyStatus
 		if err == nil {
-			for historyRows.Next() {
-				var dh DailyHistory
-				if err := historyRows.Scan(&dh.IsUp, &dh.Date); err == nil {
-					rawHistory = append(rawHistory, dh)
+			for histRows.Next() {
+				var d DailyStatus
+				if err := histRows.Scan(&d.IsUp, &d.Date); err == nil {
+					rawHistory = append(rawHistory, d)
 				}
 			}
-			historyRows.Close()
+			histRows.Close()
 		}
 
-		// Aggregate by day (if any down, day is down)
+		// Kunlar bo'yicha aggregate
 		dailyMap := make(map[string]bool)
 		for _, rh := range rawHistory {
-			if _, ok := dailyMap[rh.Date]; ok {
+			if cur, ok := dailyMap[rh.Date]; ok {
 				if !rh.IsUp {
-					dailyMap[rh.Date] = false // Once down, day is down
+					dailyMap[rh.Date] = false
+				} else {
+					dailyMap[rh.Date] = cur
 				}
 			} else {
 				dailyMap[rh.Date] = rh.IsUp
 			}
 		}
 
-		// Generate exactly 7 days
-		var aggregatedHistory []DailyHistory
-		upDaysCount := 0
+		// So'nggi 7 kun
+		var history []DailyStatus
+		upCount := 0
 		for i := 6; i >= 0; i-- {
-			// Calculate the date string for (today - i days)
-			// In Go, formatting time:
 			dateStr := time.Now().AddDate(0, 0, -i).Format("2006-01-02")
-			
 			isUp := true
 			if val, ok := dailyMap[dateStr]; ok {
 				isUp = val
-			} else {
-				// No data for this day, assume up or ignore
-				isUp = true
 			}
-			
 			if isUp {
-				upDaysCount++
+				upCount++
 			}
-			
-			aggregatedHistory = append(aggregatedHistory, DailyHistory{
-				Date: dateStr,
-				IsUp: isUp,
-			})
+			history = append(history, DailyStatus{Date: dateStr, IsUp: isUp})
 		}
+		uptimePct := float64(upCount) / 7.0 * 100.0
 
-		uptimePct := (float64(upDaysCount) / 7.0) * 100.0
-
-		// Current status
+		// Hozirgi status (eng oxirgi heartbeat)
 		isCurrentlyUp := true
 		if len(rawHistory) > 0 {
 			isCurrentlyUp = rawHistory[0].IsUp
 		}
-
 		if !isCurrentlyUp {
 			allUp = false
 		}
 
-		compStatus := &ComponentStatus{
+		// Component nomi
+		compName := capitalize(m.ComponentType)
+		if compName == "" {
+			compName = "Service"
+		}
+
+		proj.Components = append(proj.Components, ComponentData{
+			Name:      compName,
+			Type:      m.ComponentType,
 			IsUp:      isCurrentlyUp,
 			UptimePct: uptimePct,
-			History:   aggregatedHistory,
-		}
-
-		if m.ComponentType == "frontend" {
-			proj.Frontend = compStatus
-		} else {
-			proj.Backend = compStatus
-		}
+			History:   history,
+		})
 	}
 
-	for _, p := range projectsMap {
-		response.Projects = append(response.Projects, *p)
-	}
-
-	if !allUp && len(response.Projects) > 0 {
-		response.Status = "Partial Outage"
+	// 3. Response yasash
+	response := PublicStatusResponse{}
+	for _, id := range projectOrder {
+		if p, ok := projectsMap[id]; ok {
+			response.Projects = append(response.Projects, *p)
+		}
 	}
 	if response.Projects == nil {
 		response.Projects = []PublicProjectData{}
 	}
 
+	downCount := 0
+	for _, p := range response.Projects {
+		for _, c := range p.Components {
+			if !c.IsUp {
+				downCount++
+			}
+		}
+	}
+	if allUp || downCount == 0 {
+		response.Status = "All Systems Operational"
+	} else if downCount > 2 {
+		response.Status = "Major Outage"
+	} else {
+		response.Status = "Partial Outage"
+	}
+
+	log.Printf("[STATUS] Response: %d projects, status=%s", len(response.Projects), response.Status)
 	json.NewEncoder(w).Encode(response)
+}
+
+func capitalize(s string) string {
+	if s == "" {
+		return s
+	}
+	return string([]byte{s[0] - 32}) + s[1:]
 }
