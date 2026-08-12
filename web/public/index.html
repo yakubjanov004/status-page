@@ -3,189 +3,143 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>System Status</title>
-    <meta name="description" content="Real-time system status and uptime monitoring">
+    <title>System Status — Darrov</title>
+    <meta name="description" content="Real-time system status monitoring for Darrov services">
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        * { box-sizing: border-box; }
-        body {
-            font-family: 'Inter', sans-serif;
-            background: #080d1a;
-            color: #e2e8f0;
-            min-height: 100vh;
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', sans-serif; background: #060a14; color: #e2e8f0; }
+
+        /* Subtle animated gradient */
+        .page-bg {
+            background:
+                radial-gradient(ellipse 80% 40% at 50% -10%, rgba(99,102,241,0.08), transparent),
+                radial-gradient(ellipse 50% 30% at 80% 100%, rgba(16,185,129,0.04), transparent);
         }
 
-        /* Animated gradient background */
-        .bg-gradient-anim {
-            background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99,102,241,0.15), transparent),
-                        radial-gradient(ellipse 60% 40% at 80% 80%, rgba(16,185,129,0.05), transparent);
-        }
-
-        /* Glass card */
+        /* Glass */
         .glass {
-            background: rgba(15, 23, 42, 0.7);
-            backdrop-filter: blur(16px);
-            border: 1px solid rgba(255,255,255,0.07);
-        }
-        .glass:hover {
-            border-color: rgba(255,255,255,0.12);
-            background: rgba(15, 23, 42, 0.85);
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.06);
         }
 
-        /* Status banner */
-        .banner-up   { border-color: rgba(16,185,129,0.35); background: rgba(16,185,129,0.06); }
-        .banner-down { border-color: rgba(239,68,68,0.35);  background: rgba(239,68,68,0.06); }
-
-        /* Pulse dots */
-        .dot-up   { background: #10b981; box-shadow: 0 0 0 0 rgba(16,185,129,0.6); animation: pulse-up   2s infinite; }
-        .dot-down { background: #ef4444; box-shadow: 0 0 0 0 rgba(239,68,68,0.6);  animation: pulse-down 2s infinite; }
-        .dot-warn { background: #f59e0b; box-shadow: 0 0 0 0 rgba(245,158,11,0.6); animation: pulse-warn 2s infinite; }
-
-        @keyframes pulse-up   { 70% { box-shadow: 0 0 0 8px rgba(16,185,129,0); } 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); } }
-        @keyframes pulse-down { 70% { box-shadow: 0 0 0 8px rgba(239,68,68,0); }  100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); } }
-        @keyframes pulse-warn { 70% { box-shadow: 0 0 0 8px rgba(245,158,11,0); } 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); } }
+        /* Pulse animations */
+        @keyframes pulse-g { 0%,100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); } 50% { box-shadow: 0 0 0 6px rgba(16,185,129,0.25); } }
+        @keyframes pulse-r { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }  50% { box-shadow: 0 0 0 6px rgba(239,68,68,0.25); } }
+        .dot-up   { background: #10b981; animation: pulse-g 2.5s infinite; }
+        .dot-down { background: #ef4444; animation: pulse-r 2.5s infinite; }
 
         /* History bars */
-        .bar {
-            flex: 1;
-            height: 32px;
-            border-radius: 4px;
-            transition: transform 0.15s, filter 0.15s;
-            cursor: default;
-            min-width: 0;
-        }
-        .bar:hover { transform: scaleY(1.12); filter: brightness(1.3); }
-        .bar-up    { background: #10b981; }
-        .bar-down  { background: #ef4444; }
-        .bar-empty { background: rgba(51,65,85,0.6); }
+        .hbar { flex:1; min-width:0; border-radius:3px; transition: transform .12s, filter .12s; cursor:default; }
+        .hbar:hover { transform: scaleY(1.15); filter: brightness(1.35); }
+        .hbar-up   { background: #10b981; }
+        .hbar-down { background: #ef4444; }
+        .hbar-none { background: rgba(51,65,85,0.5); }
 
-        /* Component tag */
-        .tag { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; }
-        .tag-up   { background: rgba(16,185,129,0.15); color: #34d399; }
-        .tag-down { background: rgba(239,68,68,0.15);  color: #f87171; }
+        /* Tooltip */
+        .tip { visibility:hidden; opacity:0; transition: opacity .15s, visibility .15s; }
+        .hbar:hover .tip { visibility:visible; opacity:1; }
 
-        /* Skeleton shimmer */
-        @keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
-        .skeleton {
-            background: linear-gradient(90deg, rgba(30,41,59,0.8) 25%, rgba(51,65,85,0.5) 50%, rgba(30,41,59,0.8) 75%);
-            background-size: 400px 100%;
-            animation: shimmer 1.4s infinite;
-            border-radius: 8px;
-        }
+        /* Skeleton */
+        @keyframes shimmer { 0%{background-position:-400px 0}100%{background-position:400px 0} }
+        .skel { background:linear-gradient(90deg,rgba(30,41,59,.8) 25%,rgba(51,65,85,.4) 50%,rgba(30,41,59,.8) 75%); background-size:400px 100%; animation:shimmer 1.3s infinite; border-radius:12px; }
 
-        /* Uptime badge */
-        .uptime-up   { color: #34d399; }
-        .uptime-down { color: #f87171; }
+        /* Fade */
+        @keyframes fadeUp { from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none} }
+        .fade-up { animation: fadeUp .35s ease forwards; }
 
-        /* Fade in */
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-        .fade-in { animation: fadeIn 0.3s ease forwards; }
+        /* Status badge */
+        .badge { font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; padding:3px 10px; border-radius:999px; }
+        .badge-up   { background:rgba(16,185,129,.12); color:#34d399; }
+        .badge-down { background:rgba(239,68,68,.12); color:#f87171; }
+        .badge-part { background:rgba(245,158,11,.12); color:#fbbf24; }
     </style>
 </head>
-<body class="bg-gradient-anim" x-data="statusPage()" x-init="init()">
+<body class="page-bg min-h-screen flex flex-col" x-data="statusApp()" x-init="init()">
 
     <!-- Header -->
-    <header class="w-full py-5 px-6 md:px-10 flex items-center border-b border-white/5">
-        <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center font-extrabold text-white text-lg shadow-lg shadow-indigo-600/40">S</div>
-            <span class="text-lg font-bold tracking-tight text-slate-100">Status</span>
+    <header class="w-full py-4 px-5 md:px-8 flex items-center justify-between border-b border-white/5">
+        <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center font-extrabold text-white text-sm shadow-lg shadow-indigo-500/30">D</div>
+            <span class="font-bold text-slate-100 text-[15px] tracking-tight">Darrov Status</span>
         </div>
-        <div class="ml-auto flex items-center gap-2 text-xs text-slate-500">
-            <span class="w-2 h-2 rounded-full inline-block" :class="wsConnected ? 'bg-emerald-500' : 'bg-slate-600'"></span>
-            <span x-text="wsConnected ? 'Live' : 'Connecting...'"></span>
+        <div class="flex items-center gap-1.5 text-[11px] text-slate-500">
+            <span class="w-1.5 h-1.5 rounded-full" :class="live ? 'bg-emerald-400' : 'bg-slate-600'"></span>
+            <span x-text="live ? 'Live' : 'Connecting'"></span>
         </div>
     </header>
 
-    <main class="max-w-3xl mx-auto px-4 py-10 space-y-8">
+    <main class="flex-1 max-w-2xl w-full mx-auto px-4 py-8 space-y-6">
 
-        <!-- Loading state -->
+        <!-- Skeleton -->
         <template x-if="loading">
             <div class="space-y-4">
-                <div class="skeleton h-20 w-full"></div>
-                <div class="skeleton h-40 w-full"></div>
-                <div class="skeleton h-40 w-full"></div>
-                <div class="skeleton h-40 w-full"></div>
+                <div class="skel h-[72px] w-full"></div>
+                <div class="skel h-[180px] w-full"></div>
+                <div class="skel h-[180px] w-full"></div>
+                <div class="skel h-[140px] w-full"></div>
+                <div class="skel h-[140px] w-full"></div>
             </div>
         </template>
 
-        <!-- Loaded state -->
         <template x-if="!loading">
-            <div class="space-y-6 fade-in">
+            <div class="space-y-5 fade-up">
 
-                <!-- Global Status Banner -->
-                <div class="glass rounded-2xl px-6 py-5 flex items-center justify-between transition-all duration-500"
-                     :class="overallDotClass === 'dot-up' ? 'banner-up' : 'banner-down'">
-                    <div class="flex items-center gap-4">
-                        <div class="w-4 h-4 rounded-full flex-shrink-0" :class="overallDotClass"></div>
+                <!-- Banner -->
+                <div class="glass rounded-2xl px-5 py-4 flex items-center justify-between"
+                     :class="allOk ? 'border-emerald-500/20' : 'border-red-500/20'"
+                     :style="allOk ? 'box-shadow:0 0 40px rgba(16,185,129,.04)' : 'box-shadow:0 0 40px rgba(239,68,68,.04)'">
+                    <div class="flex items-center gap-3">
+                        <div class="w-3 h-3 rounded-full shrink-0" :class="allOk ? 'dot-up' : 'dot-down'"></div>
                         <div>
-                            <div class="text-xl font-bold text-white" x-text="data.status || '—'"></div>
-                            <div class="text-xs text-slate-400 mt-0.5" x-text="lastUpdated"></div>
+                            <div class="font-bold text-white text-lg leading-tight" x-text="data.status"></div>
+                            <div class="text-[11px] text-slate-500 mt-0.5" x-text="updated"></div>
                         </div>
-                    </div>
-                    <div class="text-xs text-slate-500 hidden sm:block">
-                        <span x-text="data.projects ? data.projects.length + ' projects' : ''"></span>
                     </div>
                 </div>
 
-                <!-- No projects -->
-                <template x-if="data.projects && data.projects.length === 0">
-                    <div class="glass rounded-2xl px-6 py-16 text-center text-slate-500">
-                        <div class="text-4xl mb-3">📡</div>
-                        <div class="font-medium">No projects found</div>
-                        <div class="text-sm mt-1">Set DISCOVERY_NGINX_DIR and DISCOVERY_SYSTEMD_DIR in .env</div>
-                    </div>
-                </template>
+                <!-- Projects -->
+                <template x-for="(proj, pi) in data.projects" :key="proj.id">
+                    <div class="glass rounded-2xl overflow-hidden fade-up" :style="'animation-delay:' + (pi*60) + 'ms'">
 
-                <!-- Project Cards -->
-                <template x-for="(project, pi) in data.projects" :key="project.id">
-                    <div class="glass rounded-2xl overflow-hidden transition-all duration-200 fade-in">
-
-                        <!-- Project Header -->
-                        <div class="px-6 py-4 flex items-center justify-between border-b border-white/5">
-                            <div class="flex items-center gap-3">
-                                <div class="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                                     :class="projectIsUp(project) ? 'bg-emerald-500' : 'bg-red-500'"></div>
-                                <h3 class="font-bold text-white text-base" x-text="project.name"></h3>
+                        <!-- Project header -->
+                        <div class="px-5 py-3.5 flex items-center justify-between border-b border-white/5">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-2 h-2 rounded-full shrink-0" :class="projOk(proj) ? 'dot-up' : 'dot-down'"></div>
+                                <span class="font-bold text-white text-[15px]" x-text="proj.name"></span>
                             </div>
-                            <span class="tag" :class="projectIsUp(project) ? 'tag-up' : 'tag-down'"
-                                  x-text="projectStatusText(project)"></span>
+                            <span class="badge" :class="projBadge(proj)" x-text="projText(proj)"></span>
                         </div>
 
                         <!-- Components -->
-                        <div class="divide-y divide-white/5">
-                            <template x-for="(comp, ci) in project.components" :key="ci">
-                                <div class="px-6 py-4">
-                                    <div class="flex items-center justify-between mb-3">
+                        <div class="divide-y divide-white/[0.04]">
+                            <template x-for="(c, ci) in proj.components" :key="ci">
+                                <div class="px-5 py-3.5">
+                                    <!-- Component top row -->
+                                    <div class="flex items-center justify-between mb-2.5">
                                         <div class="flex items-center gap-2">
-                                            <span class="text-sm font-semibold text-slate-200" x-text="comp.name"></span>
-                                            <span class="text-xs px-1.5 py-0.5 rounded font-medium"
-                                                  :class="comp.is_up ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'"
-                                                  x-text="comp.is_up ? 'Operational' : 'Down'">
-                                            </span>
+                                            <div class="w-1.5 h-1.5 rounded-full" :class="c.is_up ? 'bg-emerald-400' : 'bg-red-400'"></div>
+                                            <span class="text-[13px] font-semibold text-slate-200" x-text="c.name"></span>
                                         </div>
-                                        <span class="text-xs font-semibold tabular-nums"
-                                              :class="comp.uptime_pct >= 99 ? 'uptime-up' : (comp.uptime_pct >= 90 ? 'text-amber-400' : 'uptime-down')"
-                                              x-text="comp.uptime_pct.toFixed(1) + '% uptime'">
-                                        </span>
+                                        <span class="text-[11px] font-bold tabular-nums"
+                                              :class="c.uptime_pct >= 99 ? 'text-emerald-400' : c.uptime_pct >= 80 ? 'text-amber-400' : 'text-red-400'"
+                                              x-text="c.uptime_pct.toFixed(1) + '%'"></span>
                                     </div>
 
                                     <!-- 7-day bars -->
-                                    <div class="flex gap-1 items-end">
-                                        <template x-for="(day, di) in comp.history" :key="di">
-                                            <div class="bar relative group"
-                                                 :class="day.is_up ? 'bar-up' : 'bar-down'">
-                                                <!-- Tooltip -->
-                                                <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-xs text-white rounded shadow-xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10"
-                                                     x-text="formatDate(day.date) + ' — ' + (day.is_up ? 'Up' : 'Down')">
-                                                </div>
+                                    <div class="flex gap-[3px] items-end h-[28px]">
+                                        <template x-for="(d, di) in c.history" :key="di">
+                                            <div class="hbar h-full relative"
+                                                 :class="d.is_up ? 'hbar-up' : 'hbar-down'">
+                                                <div class="tip absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 bg-slate-900/95 border border-white/10 text-[10px] text-white rounded-md shadow-xl whitespace-nowrap z-20"
+                                                     x-text="fmtDate(d.date) + (d.is_up ? ' — Up' : ' — Down')"></div>
                                             </div>
                                         </template>
                                     </div>
-
-                                    <!-- 7 days ago → Today -->
-                                    <div class="flex justify-between text-xs text-slate-600 mt-1.5">
+                                    <div class="flex justify-between text-[10px] text-slate-600 mt-1">
                                         <span>7 days ago</span>
                                         <span>Today</span>
                                     </div>
@@ -195,94 +149,89 @@
                     </div>
                 </template>
 
+                <!-- Empty -->
+                <template x-if="data.projects && data.projects.length === 0">
+                    <div class="glass rounded-2xl px-5 py-14 text-center text-slate-500">
+                        <div class="text-3xl mb-2">📡</div>
+                        <div class="font-medium text-sm">No projects configured</div>
+                    </div>
+                </template>
             </div>
         </template>
-
     </main>
 
-    <footer class="text-center text-xs text-slate-700 py-8">
-        Powered by Self-Hosted Status Page
+    <footer class="text-center text-[11px] text-slate-700 py-6 border-t border-white/5">
+        Powered by <span class="text-slate-500">Darrov Status</span>
     </footer>
 
     <script>
-        document.addEventListener('alpine:init', () => {
-            Alpine.data('statusPage', () => ({
-                data: { projects: [], status: '' },
-                loading: true,
-                wsConnected: false,
-                ws: null,
-                lastUpdated: 'Loading...',
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('statusApp', () => ({
+            data: { projects: [], status: '' },
+            loading: true,
+            live: false,
+            ws: null,
+            updated: '',
 
-                init() {
-                    this.fetchData();
-                    this.connectWebSocket();
-                    // Fallback: har 30 soniyada yangilash
-                    setInterval(() => this.fetchData(), 30000);
-                },
+            init() {
+                this.fetchData();
+                this.connectWS();
+                setInterval(() => this.fetchData(), 30000);
+            },
 
-                async fetchData() {
-                    try {
-                        const res = await fetch('/api/public/status');
-                        if (!res.ok) throw new Error('HTTP ' + res.status);
-                        this.data = await res.json();
-                        this.lastUpdated = 'Updated ' + new Date().toLocaleTimeString();
-                    } catch (e) {
-                        console.error('Fetch error:', e);
-                        this.data.status = 'Unable to load status';
-                        this.lastUpdated = 'Failed to update';
-                    } finally {
-                        this.loading = false;
-                    }
-                },
+            async fetchData() {
+                try {
+                    const r = await fetch('/api/public/status');
+                    if (!r.ok) throw new Error(r.status);
+                    this.data = await r.json();
+                    this.updated = 'Updated ' + new Date().toLocaleTimeString();
+                } catch(e) {
+                    this.data.status = 'Unable to load';
+                    this.updated = 'Connection error';
+                } finally { this.loading = false; }
+            },
 
-                connectWebSocket() {
-                    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-                    this.ws = new WebSocket(`${proto}//${location.host}/ws`);
+            connectWS() {
+                const p = location.protocol === 'https:' ? 'wss:' : 'ws:';
+                this.ws = new WebSocket(`${p}//${location.host}/ws`);
+                this.ws.onopen  = () => this.live = true;
+                this.ws.onclose = () => { this.live = false; setTimeout(() => this.connectWS(), 4000); };
+                this.ws.onerror = () => this.live = false;
+                this.ws.onmessage = (e) => {
+                    try { if (JSON.parse(e.data).type === 'heartbeat_update') this.fetchData(); } catch{}
+                };
+            },
 
-                    this.ws.onopen  = () => { this.wsConnected = true; };
-                    this.ws.onclose = () => {
-                        this.wsConnected = false;
-                        setTimeout(() => this.connectWebSocket(), 4000);
-                    };
-                    this.ws.onerror = () => { this.wsConnected = false; };
-                    this.ws.onmessage = (e) => {
-                        try {
-                            const msg = JSON.parse(e.data);
-                            if (msg.type === 'heartbeat_update') this.fetchData();
-                        } catch {}
-                    };
-                },
+            get allOk() {
+                if (!this.data.projects) return true;
+                return this.data.projects.every(p => this.projOk(p));
+            },
 
-                get overallDotClass() {
-                    if (!this.data.projects || this.data.projects.length === 0) return 'dot-up';
-                    const allUp = this.data.projects.every(p =>
-                        !p.components || p.components.every(c => c.is_up)
-                    );
-                    return allUp ? 'dot-up' : 'dot-down';
-                },
+            projOk(p) {
+                return !p.components || p.components.every(c => c.is_up);
+            },
 
-                projectIsUp(project) {
-                    if (!project.components || project.components.length === 0) return true;
-                    return project.components.every(c => c.is_up);
-                },
+            projText(p) {
+                if (!p.components || !p.components.length) return 'No Data';
+                const down = p.components.filter(c => !c.is_up).length;
+                if (down === 0) return 'Operational';
+                if (down === p.components.length) return 'Down';
+                return 'Partial';
+            },
 
-                projectStatusText(project) {
-                    if (!project.components || project.components.length === 0) return 'No Data';
-                    const down = project.components.filter(c => !c.is_up).length;
-                    if (down === 0) return 'Operational';
-                    if (down === project.components.length) return 'Outage';
-                    return 'Partial';
-                },
+            projBadge(p) {
+                const t = this.projText(p);
+                if (t === 'Operational') return 'badge-up';
+                if (t === 'Down') return 'badge-down';
+                return 'badge-part';
+            },
 
-                formatDate(dateStr) {
-                    try {
-                        return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-                    } catch {
-                        return dateStr;
-                    }
-                }
-            }));
-        });
+            fmtDate(s) {
+                try { return new Date(s).toLocaleDateString(undefined, {month:'short', day:'numeric'}); }
+                catch { return s; }
+            }
+        }));
+    });
     </script>
 </body>
 </html>
