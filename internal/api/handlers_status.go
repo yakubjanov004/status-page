@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"status-page/internal/db"
-	"status-page/internal/models"
 	"time"
 )
 
@@ -89,7 +88,7 @@ func GetPublicStatusHandler(w http.ResponseWriter, r *http.Request) {
 		// Aggregate by day (if any down, day is down)
 		dailyMap := make(map[string]bool)
 		for _, rh := range rawHistory {
-			if val, ok := dailyMap[rh.Date]; ok {
+			if _, ok := dailyMap[rh.Date]; ok {
 				if !rh.IsUp {
 					dailyMap[rh.Date] = false // Once down, day is down
 				}
