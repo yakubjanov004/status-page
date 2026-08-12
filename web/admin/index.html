@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - System Status</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+            color: #0f172a;
+        }
+    </style>
+</head>
+<body class="antialiased min-h-screen" x-data="adminApp()">
+
+    <!-- Login Screen -->
+    <div x-show="!authenticated" class="min-h-screen flex items-center justify-center bg-slate-100 px-4" x-cloak>
+        <div class="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 border border-slate-200">
+            <div class="text-center mb-8">
+                <div class="w-12 h-12 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-white mx-auto mb-4 text-xl shadow-lg">S</div>
+                <h2 class="text-2xl font-bold">Admin Login</h2>
+            </div>
+            
+            <form @submit.prevent="login" class="space-y-5">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Username</label>
+                    <input type="text" x-model="loginForm.username" class="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Password</label>
+                    <input type="password" x-model="loginForm.password" class="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none" required>
+                </div>
+                <div x-show="loginError" class="text-red-500 text-sm" x-text="loginError"></div>
+                <button type="submit" class="w-full bg-indigo-600 text-white font-medium py-2.5 rounded-lg hover:bg-indigo-700 transition shadow">
+                    Sign In
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div x-show="authenticated" class="min-h-screen flex flex-col" x-cloak>
+        <header class="bg-white border-b border-slate-200 sticky top-0 z-10">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white text-sm">S</div>
+                    <span class="font-bold text-lg">Dashboard</span>
+                </div>
+                <div class="flex items-center gap-4">
+                    <button @click="tab = 'projects'" :class="tab === 'projects' ? 'text-indigo-600 font-bold' : 'text-slate-500'" class="text-sm hover:text-indigo-600">Projects</button>
+                    <button @click="tab = 'discovery'" :class="tab === 'discovery' ? 'text-indigo-600 font-bold' : 'text-slate-500'" class="text-sm hover:text-indigo-600">Auto-Discovery</button>
+                    <a href="/" target="_blank" class="text-sm font-medium text-slate-500 hover:text-indigo-600">Public Page</a>
+                    <button @click="logout" class="text-sm font-medium text-slate-500 hover:text-red-600 ml-4">Logout</button>
+                </div>
+            </div>
+        </header>
+
+        <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+            
+            <!-- Projects Tab -->
+            <div x-show="tab === 'projects'">
+                <div class="flex justify-between items-center mb-6">
+                    <h1 class="text-2xl font-bold">Projects</h1>
+                    <button @click="openProjectModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm">
+                        + Add Project
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <template x-for="project in projects" :key="project.id">
+                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-lg font-bold" x-text="project.name"></h3>
+                            </div>
+                            
+                            <div class="space-y-4">
+                                <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 flex justify-between items-center">
+                                    <div>
+                                        <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Frontend</div>
+                                        <div x-show="project.frontend_monitor">
+                                            <span class="text-sm font-medium text-slate-800" x-text="project.frontend_monitor.url"></span>
+                                        </div>
+                                        <div x-show="!project.frontend_monitor" class="text-sm text-slate-400">Not configured</div>
+                                    </div>
+                                    <button x-show="!project.frontend_monitor" @click="openMonitorModal(project, 'frontend')" class="text-xs bg-white border border-slate-300 px-2 py-1 rounded shadow-sm hover:bg-slate-50">Add</button>
+                                    <button x-show="project.frontend_monitor" @click="openMonitorModal(project, 'frontend', project.frontend_monitor)" class="text-xs text-indigo-600 hover:underline">Edit</button>
+                                </div>
+                                
+                                <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 flex justify-between items-center">
+                                    <div>
+                                        <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Backend</div>
+                                        <div x-show="project.backend_monitor">
+                                            <span class="text-sm font-medium text-slate-800" x-text="project.backend_monitor.url"></span>
+                                        </div>
+                                        <div x-show="!project.backend_monitor" class="text-sm text-slate-400">Not configured</div>
+                                    </div>
+                                    <button x-show="!project.backend_monitor" @click="openMonitorModal(project, 'backend')" class="text-xs bg-white border border-slate-300 px-2 py-1 rounded shadow-sm hover:bg-slate-50">Add</button>
+                                    <button x-show="project.backend_monitor" @click="openMonitorModal(project, 'backend', project.backend_monitor)" class="text-xs text-indigo-600 hover:underline">Edit</button>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Discovery Tab -->
+            <div x-show="tab === 'discovery'">
+                <div class="flex justify-between items-center mb-6">
+                    <h1 class="text-2xl font-bold">Auto-Discovery</h1>
+                    <button @click="scanDiscovery" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2">
+                        <span x-show="scanning">Scanning...</span>
+                        <span x-show="!scanning">Scan Server</span>
+                    </button>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <table class="min-w-full divide-y divide-slate-200">
+                        <thead class="bg-slate-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Discovered Item</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Source</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Proposed Component</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Assign to Project</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200">
+                            <template x-for="item in discovered" :key="item.id">
+                                <tr class="hover:bg-slate-50 transition">
+                                    <td class="px-6 py-4">
+                                        <div class="font-medium text-slate-900" x-text="item.raw_name"></div>
+                                        <div class="text-sm text-slate-500" x-text="item.url || 'No URL (Systemd)'"></div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span class="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs uppercase font-semibold" x-text="item.source"></span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="text-sm font-semibold" x-text="item.project"></div>
+                                        <div class="text-xs text-slate-500 capitalize" x-text="item.component"></div>
+                                    </td>
+                                    <td class="px-6 py-4 text-right">
+                                        <div class="flex items-center justify-end gap-2">
+                                            <select x-model="item.selectedProjectId" class="text-sm border border-slate-300 rounded px-2 py-1 outline-none">
+                                                <option value="">-- Select Project --</option>
+                                                <template x-for="p in projects" :key="p.id">
+                                                    <option :value="p.id" x-text="p.name" :selected="p.name.toLowerCase() === item.project.toLowerCase()"></option>
+                                                </template>
+                                                <option value="new">+ Create New Project</option>
+                                            </select>
+                                            
+                                            <button @click="addDiscovered(item)" class="text-indigo-600 hover:text-indigo-900 text-sm font-medium bg-indigo-50 px-3 py-1 rounded">Add</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
+                            <tr x-show="discovered.length === 0">
+                                <td colspan="4" class="px-6 py-12 text-center text-slate-500">
+                                    No items discovered. Run a scan to find Nginx/Systemd configs.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+
+        <!-- Project Modal -->
+        <div x-show="projectModalOpen" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+            <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
+                <div class="fixed inset-0 transition-opacity bg-slate-900/50 backdrop-blur-sm" @click="projectModalOpen = false"></div>
+                <div class="relative bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:max-w-lg w-full px-6 py-5">
+                    <h3 class="text-lg font-bold mb-4">Add Project</h3>
+                    <form @submit.prevent="saveProject">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Project Name</label>
+                                <input type="text" x-model="currentProject.name" @input="updateSlug" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none" required placeholder="e.g. Datan System">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Slug</label>
+                                <input type="text" x-model="currentProject.slug" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none" required placeholder="e.g. datan-system">
+                            </div>
+                        </div>
+                        <div class="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-4">
+                            <button type="button" @click="projectModalOpen = false" class="px-4 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">Cancel</button>
+                            <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">Save</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Monitor Modal -->
+        <div x-show="monitorModalOpen" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+            <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
+                <div class="fixed inset-0 transition-opacity bg-slate-900/50 backdrop-blur-sm" @click="monitorModalOpen = false"></div>
+                <div class="relative bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:max-w-lg w-full px-6 py-5">
+                    <h3 class="text-lg font-bold mb-4">Configure <span class="capitalize" x-text="currentMonitor.component_type"></span></h3>
+                    <form @submit.prevent="saveMonitor">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-1">URL / IP:Port</label>
+                                <input type="text" x-model="currentMonitor.url" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none" required placeholder="http://127.0.0.1:8000">
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">Type</label>
+                                    <select x-model="currentMonitor.type" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none">
+                                        <option value="http">HTTP/HTTPS</option>
+                                        <option value="tcp">TCP</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">Interval (s)</label>
+                                    <input type="number" x-model="currentMonitor.interval_seconds" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none" required min="10">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-4">
+                            <button type="button" @click="monitorModalOpen = false" class="px-4 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">Cancel</button>
+                            <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">Save</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
+
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('adminApp', () => ({
+                authenticated: false,
+                tab: 'projects',
+                loginForm: { username: '', password: '' },
+                loginError: '',
+                projects: [],
+                discovered: [],
+                scanning: false,
+                
+                projectModalOpen: false,
+                currentProject: {},
+                pendingDiscoveredItem: null, // used when creating a new project from discovery
+                
+                monitorModalOpen: false,
+                currentMonitor: {},
+                
+                async init() {
+                    await this.checkAuth();
+                    if (this.authenticated) {
+                        this.loadProjects();
+                    }
+                },
+
+                async checkAuth() {
+                    try {
+                        const res = await fetch('/api/auth/check');
+                        if (res.ok) {
+                            this.authenticated = true;
+                        }
+                    } catch (e) {}
+                },
+
+                async login() {
+                    try {
+                        const res = await fetch('/api/auth/login', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(this.loginForm)
+                        });
+                        if (res.ok) {
+                            this.authenticated = true;
+                            this.loginError = '';
+                            this.loadProjects();
+                        } else {
+                            this.loginError = 'Invalid credentials';
+                        }
+                    } catch (e) {
+                        this.loginError = 'Connection error';
+                    }
+                },
+
+                async logout() {
+                    await fetch('/api/auth/logout', { method: 'POST' });
+                    this.authenticated = false;
+                    this.loginForm.password = '';
+                },
+
+                async loadProjects() {
+                    const res = await fetch('/api/projects');
+                    if (res.ok) {
+                        this.projects = await res.json();
+                        
+                        // Auto-select match for discovered items
+                        for (let d of this.discovered) {
+                            if (!d.selectedProjectId) {
+                                const match = this.projects.find(p => p.name.toLowerCase() === d.project.toLowerCase());
+                                if (match) d.selectedProjectId = match.id;
+                            }
+                        }
+                    }
+                },
+
+                async scanDiscovery() {
+                    this.scanning = true;
+                    try {
+                        const res = await fetch('/api/discovery/scan');
+                        if (res.ok) {
+                            this.discovered = await res.json();
+                            // pre-select dropdowns
+                            for (let d of this.discovered) {
+                                const match = this.projects.find(p => p.name.toLowerCase() === d.project.toLowerCase());
+                                if (match) d.selectedProjectId = match.id;
+                            }
+                        }
+                    } finally {
+                        this.scanning = false;
+                    }
+                },
+
+                async addDiscovered(item) {
+                    if (item.selectedProjectId === 'new') {
+                        this.pendingDiscoveredItem = item;
+                        this.currentProject = { name: item.project, slug: item.project.toLowerCase().replace(/[^a-z0-9]+/g, '-'), show_on_public_page: true };
+                        this.projectModalOpen = true;
+                        return;
+                    }
+
+                    if (!item.selectedProjectId) {
+                        alert('Please select a project to assign this to, or create a new one.');
+                        return;
+                    }
+
+                    const reqBody = {
+                        project_id: parseInt(item.selectedProjectId),
+                        name: item.project + ' ' + item.component,
+                        type: 'http',
+                        url: item.url || (item.source === 'systemd' ? 'http://127.0.0.1:YOUR_PORT' : 'http://unknown'),
+                        component: item.component
+                    };
+
+                    const res = await fetch('/api/discovery/add', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(reqBody)
+                    });
+                    
+                    if (res.ok) {
+                        this.discovered = this.discovered.filter(d => d.id !== item.id);
+                        this.loadProjects();
+                        this.tab = 'projects';
+                    } else {
+                        alert('Failed to add monitor. Maybe a component of this type already exists for the project?');
+                    }
+                },
+
+                updateSlug() {
+                    if(this.currentProject.name) {
+                        this.currentProject.slug = this.currentProject.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                    }
+                },
+
+                openProjectModal() {
+                    this.pendingDiscoveredItem = null;
+                    this.currentProject = { name: '', slug: '', show_on_public_page: true };
+                    this.projectModalOpen = true;
+                },
+
+                async saveProject() {
+                    const res = await fetch('/api/projects', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(this.currentProject)
+                    });
+                    if (res.ok) {
+                        const newProj = await res.json();
+                        this.projectModalOpen = false;
+                        await this.loadProjects();
+                        
+                        if (this.pendingDiscoveredItem) {
+                            this.pendingDiscoveredItem.selectedProjectId = newProj.id;
+                            await this.addDiscovered(this.pendingDiscoveredItem);
+                        }
+                    }
+                },
+
+                openMonitorModal(project, type, monitor = null) {
+                    if (monitor) {
+                        this.currentMonitor = JSON.parse(JSON.stringify(monitor));
+                    } else {
+                        this.currentMonitor = {
+                            name: `${project.name} ${type}`,
+                            type: 'http',
+                            url: '',
+                            interval_seconds: 60,
+                            timeout_seconds: 10,
+                            expected_status_code: 200,
+                            is_active: true,
+                            show_on_public_page: true,
+                            project_id: project.id,
+                            component_type: type
+                        };
+                    }
+                    this.monitorModalOpen = true;
+                },
+
+                async saveMonitor() {
+                    const isNew = !this.currentMonitor.id;
+                    const url = isNew ? '/api/monitors' : `/api/monitors/${this.currentMonitor.id}`;
+                    const method = isNew ? 'POST' : 'PUT';
+                    
+                    this.currentMonitor.interval_seconds = parseInt(this.currentMonitor.interval_seconds);
+
+                    const res = await fetch(url, {
+                        method,
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(this.currentMonitor)
+                    });
+
+                    if (res.ok) {
+                        this.monitorModalOpen = false;
+                        this.loadProjects();
+                    }
+                }
+            }));
+        });
+    </script>
+</body>
+</html>

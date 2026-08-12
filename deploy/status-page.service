@@ -1,0 +1,16 @@
+[Unit]
+Description=Status Page Monitoring Service
+After=network.target
+
+[Service]
+Type=simple
+User=statuspage
+Group=www-data
+WorkingDirectory=/opt/status-page
+ExecStart=/opt/status-page/status-page
+Restart=always
+RestartSec=5
+EnvironmentFile=/opt/status-page/.env
+
+[Install]
+WantedBy=multi-user.target
