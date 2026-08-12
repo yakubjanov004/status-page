@@ -6,7 +6,6 @@ import (
 	"status-page/internal/db"
 )
 
-// Hardcoded loyihalar va ularning monitorlari
 type projectDef struct {
 	Name       string
 	Slug       string
@@ -19,13 +18,13 @@ type componentDef struct {
 	URL           string
 }
 
+// To'g'ri portlar — serverdan olingan
 var projects = []projectDef{
 	{
 		Name: "Datan",
 		Slug: "datan",
 		Components: []componentDef{
-			{Name: "Datan Frontend", ComponentType: "frontend", URL: "http://127.0.0.1:5177"},
-			{Name: "Datan Backend", ComponentType: "backend", URL: "http://127.0.0.1:8100"},
+			{Name: "Datan Backend", ComponentType: "backend", URL: "http://127.0.0.1:8003"},
 		},
 	},
 	{
@@ -53,13 +52,10 @@ var projects = []projectDef{
 	},
 }
 
-// AutoSeed — faqat 4 ta loyiha va ularning monitorlarini yaratadi.
-// Idempotent: mavjud bo'lsa qayta yaratmaydi.
 func AutoSeed() {
 	log.Println("[SEED] Syncing hardcoded projects...")
 
 	for _, p := range projects {
-		// Loyiha mavjudmi?
 		var projectID int64
 		err := db.DB.QueryRow(`SELECT id FROM projects WHERE slug = ?`, p.Slug).Scan(&projectID)
 		if err != nil {
@@ -77,7 +73,6 @@ func AutoSeed() {
 			log.Printf("[SEED] Project '%s' exists (id=%d)", p.Name, projectID)
 		}
 
-		// Monitorlar
 		for _, c := range p.Components {
 			var existing int
 			db.DB.QueryRow(
