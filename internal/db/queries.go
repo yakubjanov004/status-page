@@ -43,7 +43,7 @@ func GetActiveMonitors() ([]models.Monitor, error) {
 
 func SaveHeartbeat(hb *models.Heartbeat) error {
 	res, err := DB.Exec(`INSERT INTO heartbeats (monitor_id, is_up, response_time_ms, status_code, error_message, checked_at) VALUES (?, ?, ?, ?, ?, ?)`,
-		hb.MonitorID, hb.IsUp, hb.ResponseTimeMs, hb.StatusCode, hb.ErrorMessage, hb.CheckedAt)
+		hb.MonitorID, hb.IsUp, hb.Latency, hb.StatusCode, hb.Message, hb.CheckedAt)
 	if err != nil {
 		return err
 	}
@@ -93,17 +93,14 @@ func GetRecentHeartbeats(monitorID int, limit int) ([]models.Heartbeat, error) {
 	var hbs []models.Heartbeat
 	for rows.Next() {
 		var hb models.Heartbeat
-		// error_message could be null, need to handle
 		var errMsg sql.NullString
-		if err := rows.Scan(&hb.ID, &hb.MonitorID, &hb.IsUp, &hb.ResponseTimeMs, &hb.StatusCode, &errMsg, &hb.CheckedAt); err != nil {
+		if err := rows.Scan(&hb.ID, &hb.MonitorID, &hb.IsUp, &hb.Latency, &hb.StatusCode, &errMsg, &hb.CheckedAt); err != nil {
 			return nil, err
 		}
 		if errMsg.Valid {
-			hb.ErrorMessage = errMsg.String
+			hb.Message = errMsg.String
 		}
 		hbs = append(hbs, hb)
 	}
-	
-	// Reverse to get chronological order if needed, but usually we want to send them as is and reverse on frontend or here
 	return hbs, nil
 }
