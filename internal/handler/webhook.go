@@ -62,7 +62,7 @@ func requestIDMiddleware(next http.Handler) http.Handler {
 			var b [8]byte
 			if _, err := rand.Read(b[:]); err != nil {
 				// Fallback: use a simple counter string (should never happen)
-				reqID = fmt.Sprintf("wh-fallback")
+				reqID = "wh-fallback"
 			} else {
 				reqID = "wh-" + hex.EncodeToString(b[:])
 			}
