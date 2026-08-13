@@ -1,0 +1,31 @@
+# Git line ending policy
+# Ensures shell scripts always use LF (Unix) line endings,
+# regardless of the OS where git checkout is performed.
+
+# Default: normalize to LF on commit
+* text=auto eol=lf
+
+# Shell scripts must always be LF
+*.sh    text eol=lf
+
+# Systemd unit files — LF
+*.service text eol=lf
+*.timer   text eol=lf
+
+# Go source — LF
+*.go    text eol=lf
+*.mod   text eol=lf
+*.sum   text eol=lf
+*.sql   text eol=lf
+
+# Markdown and config — LF
+*.md    text eol=lf
+*.env   text eol=lf
+*.conf  text eol=lf
+*.json  text eol=lf
+*.yaml  text eol=lf
+*.yml   text eol=lf
+
+# Binaries — no conversion
+*.db    binary
+bin/*   binary
