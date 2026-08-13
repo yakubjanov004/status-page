@@ -109,9 +109,10 @@ for unit in $UNITS; do
     fi
 done
 
-printf '\n------------------------------------------------------\n'
+printf '\n'
+printf '%s\n' '------------------------------------------------------'
 printf '  Found: %d  Skipped: %d\n' "$FOUND" "$SKIPPED"
-printf '------------------------------------------------------\n\n'
+printf '%s\n\n' '------------------------------------------------------'
 
 if [ "$FOUND" -eq 0 ]; then
     printf 'No matching units found in %s\n' "$SYSTEMD_DIR"
@@ -143,4 +144,4 @@ for unit in $UNITS; do
 done
 
 printf '    systemctl daemon-reload\n'
-printf '\n======================================================\n\n'
+printf '%s\n\n' '======================================================'
