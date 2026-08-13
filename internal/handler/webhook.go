@@ -2,11 +2,15 @@ package handler
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
-	"math/rand"
 	"net/http"
 	"strconv"
 	"time"
@@ -24,13 +28,20 @@ const ctxRequestID contextKey = "request_id"
 
 // Handler holds the webhook HTTP handlers and their dependencies.
 type Handler struct {
-	db        *webhookdb.DB
-	hookToken string
+	db         *webhookdb.DB
+	hookToken  string
+	hmacSecret string // optional; if set, X-Hub-Signature-256 is verified
 }
 
 // New creates a new Handler.
 func New(db *webhookdb.DB, hookToken string) *Handler {
 	return &Handler{db: db, hookToken: hookToken}
+}
+
+// NewWithHMAC creates a Handler with optional HMAC-SHA256 signature verification.
+// If hmacSecret is empty, HMAC verification is skipped (token-only auth).
+func NewWithHMAC(db *webhookdb.DB, hookToken, hmacSecret string) *Handler {
+	return &Handler{db: db, hookToken: hookToken, hmacSecret: hmacSecret}
 }
 
 // maxBodySize limits request body to 64KB to prevent abuse.
@@ -42,13 +53,19 @@ const maxServiceNameLen = 64
 // ---------- Middleware ----------
 
 // requestIDMiddleware reads X-Request-Id from the incoming request (if present)
-// or generates a short random ID, then stores it in the context and echoes it
-// in the X-Request-Id response header for end-to-end traceability.
+// or generates a cryptographically random 8-byte hex ID (wh-XXXXXXXXXXXXXXXX),
+// stores it in the context, and echoes it in the X-Request-Id response header.
 func requestIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		reqID := r.Header.Get("X-Request-Id")
 		if reqID == "" {
-			reqID = fmt.Sprintf("wh-%08x", rand.Uint32())
+			var b [8]byte
+			if _, err := rand.Read(b[:]); err != nil {
+				// Fallback: use a simple counter string (should never happen)
+				reqID = fmt.Sprintf("wh-fallback")
+			} else {
+				reqID = "wh-" + hex.EncodeToString(b[:])
+			}
 		}
 		w.Header().Set("X-Request-Id", reqID)
 		ctx := context.WithValue(r.Context(), ctxRequestID, reqID)
@@ -78,6 +95,82 @@ func (h *Handler) requireToken(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+// verifyHMAC validates the X-Hub-Signature-256 header when hmacSecret is configured.
+// Uses GitHub-style HMAC-SHA256: "sha256=<hex(HMAC-SHA256(body, secret))>".
+// The body is read, buffered, and restored so downstream handlers can re-read it.
+// If hmacSecret is empty, this middleware is a no-op pass-through.
+func (h *Handler) verifyHMAC(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if h.hmacSecret == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Read and buffer the body (up to maxBodySize)
+		body, err := io.ReadAll(io.LimitReader(r.Body, maxBodySize+1))
+		if err != nil || len(body) > maxBodySize {
+			writeJSON(w, http.StatusBadRequest, model.ErrorResponse{
+				Error:     "request body too large or unreadable",
+				RequestID: getRequestID(r),
+			})
+			return
+		}
+		// Restore the body for downstream handlers
+		r.Body = io.NopCloser(bytesReader(body))
+
+		// Compute expected signature
+		mac := hmac.New(sha256.New, []byte(h.hmacSecret))
+		mac.Write(body)
+		expected := "sha256=" + hex.EncodeToString(mac.Sum(nil))
+
+		got := r.Header.Get("X-Hub-Signature-256")
+		if got == "" {
+			writeJSON(w, http.StatusUnauthorized, model.ErrorResponse{
+				Error:     "missing X-Hub-Signature-256 header (HMAC verification required)",
+				RequestID: getRequestID(r),
+			})
+			return
+		}
+		if !hmac.Equal([]byte(got), []byte(expected)) {
+			log.Printf("[webhook] %s: HMAC mismatch (got %s, want %s)",
+				getRequestID(r), got[:min(len(got), 20)], expected[:20])
+			writeJSON(w, http.StatusUnauthorized, model.ErrorResponse{
+				Error:     "unauthorized: HMAC signature mismatch",
+				RequestID: getRequestID(r),
+			})
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// bytesReader wraps a byte slice as an io.Reader (avoids bytes import at package level).
+func bytesReader(b []byte) io.Reader {
+	return &byteSliceReader{b: b}
+}
+
+type byteSliceReader struct {
+	b   []byte
+	pos int
+}
+
+func (r *byteSliceReader) Read(p []byte) (int, error) {
+	if r.pos >= len(r.b) {
+		return 0, io.EOF
+	}
+	n := copy(p, r.b[r.pos:])
+	r.pos += n
+	return n, nil
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 
 // ---------- POST /api/v1/webhook ----------
 

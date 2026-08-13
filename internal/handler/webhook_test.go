@@ -32,11 +32,13 @@ func setupTestDB(t *testing.T) *webhookdb.DB {
 }
 
 // setupTestRouter creates a chi router with all webhook routes for testing.
+// hmacSecret="" disables HMAC verification (token-only auth).
 func setupTestRouter(db *webhookdb.DB, token string) *chi.Mux {
 	r := chi.NewRouter()
-	SetupRoutes(r, db, token)
+	SetupRoutes(r, db, token, "" /* hmacSecret: disabled in tests */)
 	return r
 }
+
 
 const testToken = "test-token-secret"
 

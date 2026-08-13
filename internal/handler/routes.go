@@ -8,8 +8,8 @@ import (
 )
 
 // SetupRoutes wires all webhook API routes onto the given chi mux.
-func SetupRoutes(r *chi.Mux, db *webhookdb.DB, hookToken string) {
-	h := New(db, hookToken)
+func SetupRoutes(r *chi.Mux, db *webhookdb.DB, hookToken, hmacSecret string) {
+	h := NewWithHMAC(db, hookToken, hmacSecret)
 
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RealIP)
@@ -23,8 +23,8 @@ func SetupRoutes(r *chi.Mux, db *webhookdb.DB, hookToken string) {
 
 	// Public read-only API (no auth required for read endpoints)
 	r.Route("/api/v1", func(api chi.Router) {
-		// Webhook endpoint requires token auth
-		api.With(h.requireToken).Post("/webhook", h.HandleWebhook)
+		// Webhook endpoint: token auth + optional HMAC signature verification
+		api.With(h.requireToken, h.verifyHMAC).Post("/webhook", h.HandleWebhook)
 
 		// Read-only endpoints
 		api.Get("/services", h.HandleListServices)
