@@ -1,17 +1,22 @@
 [Unit]
 Description=Docker Container Watcher for Tokpoint
 Documentation=https://github.com/yakubjanov004/status-page
-Wants=network-online.target docker.service
-After=network-online.target docker.service
+# Start after both Docker daemon and tokpoint containers are up
+Wants=network-online.target docker.service tokpoint-docker.service
+After=network-online.target docker.service tokpoint-docker.service
 
 [Service]
 Type=simple
-# Requires access to /var/run/docker.sock — must be root or in docker group
-User=root
+# Runs as root to access /var/run/docker.sock
+# (root already has access on this server)
+WorkingDirectory=/opt/status-webhook
+EnvironmentFile=/opt/status-webhook/.env
+# Override container name and service name via env file if needed:
+#   TOKPOINT_CONTAINER_NAME=tokpoint-backend-1
+#   TOKPOINT_SERVICE_NAME=Tokpoint
 ExecStart=/usr/local/bin/docker-watcher
 Restart=always
 RestartSec=10
-EnvironmentFile=/opt/status-webhook/.env
 
 StandardOutput=journal
 StandardError=journal
