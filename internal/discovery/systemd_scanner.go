@@ -33,6 +33,7 @@ func ScanSystemd(dir string) ([]DiscoveredItem, error) {
 		url := ""
 		path := filepath.Join(dir, file.Name())
 		if f, err := os.Open(path); err == nil {
+			defer f.Close()
 			scanner := bufio.NewScanner(f)
 			for scanner.Scan() {
 				line := strings.TrimSpace(scanner.Text())
@@ -47,7 +48,10 @@ func ScanSystemd(dir string) ([]DiscoveredItem, error) {
 					break
 				}
 			}
-			f.Close()
+			if err := scanner.Err(); err != nil {
+				f.Close()
+				return nil, err
+			}
 		}
 
 		items = append(items, DiscoveredItem{

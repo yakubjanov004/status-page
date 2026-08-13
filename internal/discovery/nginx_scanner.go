@@ -43,6 +43,7 @@ func ScanNginx(dir string) ([]DiscoveredItem, error) {
 		if err != nil {
 			continue
 		}
+		defer f.Close()
 
 		var currentServers []string
 		currentLocation := ""
@@ -121,9 +122,9 @@ func ScanNginx(dir string) ([]DiscoveredItem, error) {
 				}
 			}
 		}
-		f.Close()
-
-		// (The processing is now inside the loop on depth == 0)
+		if err := scanner.Err(); err != nil {
+			return nil, err
+		}
 	}
 
 	return items, nil
