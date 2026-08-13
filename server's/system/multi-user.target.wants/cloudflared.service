@@ -1,0 +1,35 @@
+[Unit]
+Description=Cloudflare Tunnel
+Documentation=https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/
+Wants=network-online.target nginx.service
+After=network-online.target nginx.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+
+EnvironmentFile=/etc/cloudflared/cloudflared.env
+
+ExecStart=/usr/bin/cloudflared --no-autoupdate tunnel run --protocol http2
+
+Restart=on-failure
+RestartSec=5s
+
+TimeoutStartSec=0
+TimeoutStopSec=5s
+
+KillSignal=SIGTERM
+KillMode=mixed
+FinalKillSignal=SIGKILL
+
+LimitNOFILE=1048576
+
+NoNewPrivileges=true
+PrivateTmp=true
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cloudflared
+
+[Install]
+WantedBy=multi-user.target

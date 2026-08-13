@@ -1,0 +1,15 @@
+[Unit]
+Description=TokPoint Celery Worker Service
+After=network.target redis-server.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/tokpoint/backend
+EnvironmentFile=/root/tokpoint/backend/.env
+ExecStart=/root/tokpoint/backend/venv/bin/celery -A app.worker.celery_app worker --loglevel=info -Q audit,push,celery
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

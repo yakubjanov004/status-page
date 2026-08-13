@@ -1,0 +1,35 @@
+[Unit]
+Description=Memories FastAPI application
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/root/personal/memories
+
+EnvironmentFile=/root/personal/memories/.env
+Environment=PYTHONUNBUFFERED=1
+
+ExecStartPre=/usr/bin/install -d -m 0750 -o root -g root /root/personal/memories/logs/backend
+ExecStartPre=/usr/bin/install -d -m 0750 -o root -g root /root/personal/memories/logs/frontend
+ExecStartPre=/usr/bin/install -d -m 0750 -o root -g root /root/personal/memories/logs/nginx
+ExecStart=/root/personal/memories/backend/venv/bin/python -m uvicorn backend.main:app --host 127.0.0.1 --port 8013 --proxy-headers --forwarded-allow-ips=127.0.0.1
+
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+KillSignal=SIGINT
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+UMask=027
+
+StandardOutput=append:/root/personal/memories/logs/backend/service.log
+StandardError=append:/root/personal/memories/logs/backend/service-error.log
+SyslogIdentifier=memories
+
+[Install]
+WantedBy=multi-user.target

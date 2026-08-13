@@ -1,0 +1,17 @@
+[Unit]
+Description=Investconnect Gunicorn Service
+After=network.target
+
+[Service]
+User=root
+Group=root
+WorkingDirectory=/root/personal/Investconnect
+ExecStart=/root/personal/Investconnect/venv/bin/gunicorn \
+    --workers 3 \
+    --bind 127.0.0.1:8005 \
+    config.wsgi:application
+
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

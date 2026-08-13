@@ -1,0 +1,33 @@
+[Unit]
+Description=Memories Vite frontend
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/root/personal/memories
+
+Environment=NODE_ENV=production
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+ExecStartPre=/usr/bin/install -d -m 0750 -o root -g root /root/personal/memories/logs/frontend
+ExecStart=/usr/bin/env npm run preview -- --host 127.0.0.1 --port 5163
+
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+KillSignal=SIGINT
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+UMask=027
+
+StandardOutput=append:/root/personal/memories/logs/frontend/service.log
+StandardError=append:/root/personal/memories/logs/frontend/service-error.log
+SyslogIdentifier=memories-frontend
+
+[Install]
+WantedBy=multi-user.target

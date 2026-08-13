@@ -1,0 +1,17 @@
+[Unit]
+Description=Odim React Frontend (Production)
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/root/odimrepo/Tasks
+Environment=NODE_ENV=production
+
+# npx o'rniga to'g'ridan-to'g'ri serve ishlatamiz
+ExecStart=/usr/bin/serve -s dist -l 5120
+
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

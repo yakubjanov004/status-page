@@ -1,0 +1,23 @@
+[Unit]
+Description=DSKTP3 React Frontend (Production)
+After=network-online.target dsktp3-backend-bot.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/root/dsktp3/frontend
+EnvironmentFile=-/root/dsktp3/.env
+Environment=NODE_ENV=production
+ExecStart=/bin/sh -c 'exec npx serve -s dist -l tcp://0.0.0.0:$${FRONTEND_PORT:-5177}'
+Restart=always
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=30
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+
