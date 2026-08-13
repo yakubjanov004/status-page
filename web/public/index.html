@@ -250,6 +250,7 @@
             border: 1px solid var(--up-border);
         }
         .comp-status-badge.down { background: var(--down-bg); color: var(--down-text); border-color: var(--down-border); }
+        .comp-status-badge.warn { background: var(--warn-bg); color: var(--warn-text); border-color: var(--warn-border); }
 
         .comp-right { display: flex; align-items: center; gap: 14px; }
         .comp-meta { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; text-align: right; }
@@ -444,8 +445,17 @@
 <script>
     'use strict';
 
-    const API_URL = '/api/public/status';
+    const API_BASE = '/api/v1';
     const root = document.getElementById('app-root');
+    const TARGET_SERVICES = ["AlfaConnect", "Mehmonxona", "Odimrepo", "Tokpoint", "Datan"];
+
+    // Cache for short TTL
+    const cache = {
+        services: { data: null, expires: 0 },
+        incidents: {},
+        uptime: {}
+    };
+    const TTL_MS = 30000;
 
     // ── Theme ──────────────────────────────────────────────
     const themeBtn = document.getElementById('theme-toggle');
@@ -490,7 +500,7 @@
 
     function fmtDate(dateStr) {
         try {
-            return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         } catch (e) { return dateStr; }
     }
 
@@ -514,62 +524,147 @@
     }
 
     // ── Fetch ──────────────────────────────────────────────
+    async function fetchWithCache(url, cacheObj, key) {
+        const now = Date.now();
+        const cached = cacheObj[key];
+        if (cached && cached.expires > now) return cached.data;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        cacheObj[key] = { data, expires: now + TTL_MS };
+        return data;
+    }
+
     async function fetchStatus() {
         try {
-            const res = await fetch(API_URL + '?t=' + Date.now());
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            const data = await res.json();
-            render(data);
+            const services = await fetchWithCache(`${API_BASE}/services`, cache, 'services');
+            
+            const serviceMap = new Map();
+            services.forEach(s => serviceMap.set(s.name, s));
+
+            const renderData = [];
+            let activeIncidents = 0;
+            let totalUptimeSum = 0;
+            let validUptimeCount = 0;
+            const recentOutages = [];
+
+            for (const name of TARGET_SERVICES) {
+                const s = serviceMap.get(name);
+                if (!s) continue;
+
+                let uptimeData = null;
+                let incidentsData = { incidents: [] };
+                try {
+                    uptimeData = await fetchWithCache(`${API_BASE}/services/${name}/uptime?window=24h`, cache.uptime, name);
+                    incidentsData = await fetchWithCache(`${API_BASE}/services/${name}/incidents?limit=100`, cache.incidents, name);
+                } catch (e) {
+                    console.error(`Error fetching details for ${name}:`, e);
+                }
+
+                // A service has a partial status if last_status is "up" but open_incidents_count > 0
+                const isPartial = s.last_status === 'up' && s.open_incidents_count > 0;
+                if (s.last_status === 'down' || isPartial) {
+                    activeIncidents++;
+                }
+
+                if (uptimeData) {
+                    totalUptimeSum += uptimeData.uptime_percent;
+                    validUptimeCount++;
+                }
+                
+                (incidentsData.incidents || []).forEach(inc => {
+                   recentOutages.push(inc);
+                });
+
+                renderData.push({
+                    service: s,
+                    isPartial: isPartial,
+                    uptime: uptimeData,
+                    incidents: incidentsData.incidents || []
+                });
+            }
+
+            const overallUptime = validUptimeCount > 0 ? (totalUptimeSum / validUptimeCount) : 100;
+            
+            // Sort recent outages by start_time descending
+            recentOutages.sort((a,b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
+            // Take top 10 globally for the recent outages section
+            const topOutages = recentOutages.slice(0, 10);
+
+            render(renderData, overallUptime, activeIncidents, renderData.length, topOutages);
+            window._lastUpdatedISO = new Date().toISOString();
         } catch (err) {
             renderError(err.message);
         }
     }
 
-    // ── Render ─────────────────────────────────────────────
-    function render(data) {
-        // Update header labels
-        const siteName = data.site_name || 'Darrov Status';
-        document.title = siteName + ' — ' + (data.status || 'Status');
-        document.getElementById('logo-name').textContent = siteName;
-        document.getElementById('footer-link').textContent = siteName + ' Monitor';
-        document.getElementById('last-updated-text').textContent = 'Updated ' + timeAgo(data.last_updated);
-        document.getElementById('footer-updated').textContent = 'Updated ' + timeAgo(data.last_updated);
+    function computeSparkline(incidents = []) {
+        const days = [];
+        const now = Date.now();
+        for (let i = 6; i >= 0; i--) {
+            const dStart = new Date(now - i * 86400000);
+            dStart.setHours(0,0,0,0);
+            const startTs = dStart.getTime();
+            const endTs = startTs + 86400000;
 
-        // Status banner
+            let dayDowntimeSecs = 0;
+            const dayIncidents = [];
+
+            incidents.forEach(inc => {
+                const iStart = new Date(inc.start_time).getTime();
+                const iEnd = inc.end_time ? new Date(inc.end_time).getTime() : now;
+                
+                if (iStart < endTs && iEnd > startTs) {
+                    const overlapStart = Math.max(startTs, iStart);
+                    const overlapEnd = Math.min(endTs, iEnd);
+                    const durSecs = (overlapEnd - overlapStart) / 1000;
+                    dayDowntimeSecs += durSecs;
+                    dayIncidents.push({ ...inc, duration_seconds: durSecs, start: new Date(overlapStart).toISOString(), end: new Date(overlapEnd).toISOString() });
+                }
+            });
+
+            let pct = 100 - (dayDowntimeSecs / 86400) * 100;
+            if (pct < 0) pct = 0;
+            
+            days.push({
+                date: dStart.toISOString(),
+                pct: pct,
+                outages: dayIncidents,
+                is_up: pct >= 100
+            });
+        }
+        return days;
+    }
+
+    // ── Render ─────────────────────────────────────────────
+    function render(servicesData, overallUptime, activeIncidents, totalSvc, topOutages) {
+        document.title = 'Darrov Status — ' + (activeIncidents === 0 ? 'All Systems Operational' : 'Incidents Active');
+        const upPct = overallUptime.toFixed(3);
+
         let bannerClass = 'operational';
         let bannerIcon = '✅';
         let bannerTitle = "We're fully operational";
         let bannerSub = "No incidents affecting our systems.";
 
-        const st = data.status || '';
-        if (st.includes('Partially') || st.includes('Degraded')) {
-            bannerClass = 'degraded';
-            bannerIcon = '⚠️';
-            bannerTitle = 'Partial System Outage';
-            bannerSub = 'Some services are experiencing issues right now.';
-        } else if (st.includes('Outage') || st.includes('Major')) {
-            bannerClass = 'outage';
-            bannerIcon = '🔴';
-            bannerTitle = 'Major System Outage';
-            bannerSub = 'We are experiencing widespread issues affecting our systems.';
-        }
-
-        // Date range (7 days)
-        let dateRangeStr = 'Last 7 days';
-        if (data.projects && data.projects.length > 0) {
-            const comps = data.projects[0].components;
-            if (comps && comps.length > 0 && comps[0].history && comps[0].history.length > 0) {
-                const hist = comps[0].history;
-                const d0 = fmtDate(hist[0].date);
-                const d1 = fmtDate(hist[hist.length - 1].date);
-                dateRangeStr = `${d0} – ${d1}`;
+        if (activeIncidents > 0) {
+            const hasDown = servicesData.some(d => d.service.last_status === 'down');
+            if (hasDown) {
+                bannerClass = 'outage';
+                bannerIcon = '🔴';
+                bannerTitle = 'Major System Outage';
+                bannerSub = 'We are experiencing widespread issues affecting our systems.';
+            } else {
+                bannerClass = 'degraded';
+                bannerIcon = '⚠️';
+                bannerTitle = 'Partial System Outage';
+                bannerSub = 'Some services are experiencing issues right now.';
             }
         }
 
-        // Overall uptime
-        const upPct = typeof data.overall_uptime_pct === 'number' ? data.overall_uptime_pct.toFixed(3) : '—';
-        const totalSvc = data.total_services || 0;
-        const activeInc = data.active_incidents || 0;
+        const now = Date.now();
+        const d0 = fmtDate(new Date(now - 6 * 86400000).toISOString());
+        const d1 = fmtDate(new Date(now).toISOString());
+        const dateRangeStr = `${d0} – ${d1}`;
 
         let html = `
 <div class="status-banner ${bannerClass} fade-in">
@@ -584,7 +679,7 @@
 
 <div class="stats-row fade-in">
     <div class="stat-card">
-        <div class="stat-label">7-Day Uptime</div>
+        <div class="stat-label">24h Uptime</div>
         <div class="stat-value">${upPct}<span>%</span></div>
         <div class="stat-sub">Overall across all services</div>
     </div>
@@ -595,10 +690,10 @@
     </div>
     <div class="stat-card">
         <div class="stat-label">Active Incidents</div>
-        <div class="stat-value" style="color: ${activeInc > 0 ? 'var(--down)' : 'var(--up)'}">
-            ${activeInc}
+        <div class="stat-value" style="color: ${activeIncidents > 0 ? 'var(--down)' : 'var(--up)'}">
+            ${activeIncidents}
         </div>
-        <div class="stat-sub">${activeInc === 0 ? 'All systems normal' : 'Services currently down'}</div>
+        <div class="stat-sub">${activeIncidents === 0 ? 'All systems normal' : 'Services currently affected'}</div>
     </div>
 </div>
 
@@ -609,53 +704,50 @@
     </div>
 `;
 
-        if (!data.projects || data.projects.length === 0) {
+        if (servicesData.length === 0) {
             html += `<div style="padding: 48px; text-align:center; color:var(--text-muted)">No services configured yet.</div>`;
         } else {
-            data.projects.forEach(proj => {
-                html += `<div class="project-group">`;
-                if (data.projects.length > 1) {
-                    html += `<div class="project-label">${escHtml(proj.name)}</div>`;
-                }
-                (proj.components || []).forEach(comp => {
-                    html += renderComponent(comp);
-                });
-                html += `</div>`;
+            servicesData.forEach(data => {
+                html += renderComponent(data);
             });
         }
 
         html += `</div>`; // .status-card
-
-        // Recent Outages
-        html += renderOutagesSection(data.recent_outages || []);
-
+        html += renderOutagesSection(topOutages);
         root.innerHTML = html;
     }
 
-    function renderComponent(comp) {
-        const isUp = comp.is_up;
-        const pct = typeof comp.uptime_pct === 'number' ? comp.uptime_pct : 100;
-        const dotClass = isUp ? (pct < 100 ? 'warn' : 'up') : 'down';
-        const statusText = isUp ? (pct < 99 ? 'Degraded' : 'Operational') : 'Outage';
-        const badgeClass = isUp ? '' : 'down';
+    function renderComponent(data) {
+        const { service, isPartial, uptime, incidents } = data;
+        const isDown = service.last_status === 'down';
+        const isUp = !isDown && !isPartial;
+        
+        let dotClass = 'up';
+        let statusText = 'Operational';
+        let badgeClass = '';
 
-        const downSecs = comp.total_downtime_secs || 0;
-        const outCount = comp.total_outages || 0;
-        const latency = comp.latency || 0;
+        if (isDown) {
+            dotClass = 'down';
+            statusText = 'Outage';
+            badgeClass = 'down';
+        } else if (isPartial) {
+            dotClass = 'warn';
+            statusText = 'Degraded';
+            badgeClass = 'warn';
+        }
 
-        // Bars
-        const history = comp.history || [];
+        const pct = uptime ? uptime.uptime_percent : 100;
+        
+        const history = computeSparkline(incidents);
         let barsHtml = '';
         history.forEach(day => {
-            const p = typeof day.pct === 'number' ? day.pct : (day.is_up ? 100 : 0);
+            const p = day.pct;
             let barClass = 'c-none';
             if (p >= 100)      barClass = 'c-100';
             else if (p >= 90)  barClass = 'c-good';
             else if (p >= 50)  barClass = 'c-warn';
-            else if (p > 0)    barClass = 'c-bad';
-            else if (!day.is_up) barClass = 'c-bad';
+            else if (p >= 0)   barClass = 'c-bad';
 
-            // Tooltip
             const dateFmt = fmtDate(day.date);
             let tipContent = `<div class="tip-date">${escHtml(dateFmt)}</div>`;
 
@@ -663,7 +755,6 @@
                 tipContent += `<div class="tip-uptime">${p >= 100 ? '100.000' : p.toFixed(3)}% uptime</div>`;
                 tipContent += `<div class="tip-no-incidents">No incidents this day</div>`;
             } else {
-                const totalDtSecs = day.outages.reduce((s, o) => s + o.duration_seconds, 0);
                 tipContent += `<div class="tip-uptime">${p.toFixed(3)}% uptime</div>`;
                 day.outages.forEach(o => {
                     const dur = fmtDuration(o.duration_seconds);
@@ -678,15 +769,37 @@
 </div>`;
                 });
             }
-
             barsHtml += `<div class="bar ${barClass}"><div class="bar-tip">${tipContent}</div></div>`;
         });
 
-        let metaStr = '';
-        if (outCount > 0) {
-            metaStr = `${outCount} outage${outCount > 1 ? 's' : ''}, ${fmtDuration(downSecs)} down`;
-        } else {
-            metaStr = 'No outages in 7 days';
+        // Construct <details> for incident details
+        let recentIncidentsHtml = '';
+        if (incidents.length > 0) {
+            const recent = incidents.slice(0, 10);
+            recentIncidentsHtml = `
+            <details class="comp-details" style="margin-top: 12px; font-size: 13px;" aria-expanded="false" role="region" aria-labelledby="summary-${service.id}">
+                <summary id="summary-${service.id}" style="cursor: pointer; color: var(--accent); user-select: none;">View recent incidents</summary>
+                <div style="margin-top: 10px; padding: 10px; background: var(--surface-2); border-radius: var(--radius-sm);">
+                    ${recent.map(inc => `
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px solid var(--border-soft); padding-bottom: 8px;">
+                            <div>
+                                <strong style="color: ${inc.status === 'open' ? 'var(--down)' : 'var(--text)'}">
+                                    ${inc.status === 'open' ? '🔴 Ongoing' : '⚫ Closed'}
+                                </strong>
+                                <br/>
+                                <span style="color: var(--text-muted); font-size: 11px;">
+                                    ${fmtDateTime(inc.start_time)} &rarr; ${inc.status === 'closed' ? fmtDateTime(inc.end_time) : 'Now'}
+                                </span>
+                            </div>
+                            <div style="font-variant-numeric: tabular-nums;">
+                                ${inc.status === 'closed' ? fmtDuration(inc.duration_seconds) : '—'}
+                            </div>
+                        </div>
+                    `).join('')}
+                    <button onclick="openHistoryModal('${escHtml(service.name)}')" style="background: none; border: none; color: var(--accent); cursor: pointer; text-decoration: underline; padding: 0;">View full history</button>
+                </div>
+            </details>
+            `;
         }
 
         return `
@@ -694,14 +807,12 @@
     <div class="comp-info">
         <div class="comp-left">
             <div class="status-dot ${dotClass}"></div>
-            <div class="comp-name">${escHtml(comp.name)}</div>
+            <div class="comp-name">${escHtml(service.name)}</div>
             <div class="comp-status-badge ${badgeClass}">${escHtml(statusText)}</div>
         </div>
         <div class="comp-right">
-            ${latency > 0 ? `<div class="latency-badge">${latency}ms</div>` : ''}
             <div class="comp-meta">
-                <strong>${pct.toFixed(3)}%</strong> uptime<br>
-                <span style="font-size:11px">${escHtml(metaStr)}</span>
+                <strong>${pct.toFixed(3)}%</strong> 24h uptime
             </div>
         </div>
     </div>
@@ -710,6 +821,7 @@
         <span>7 days ago</span>
         <span>Today</span>
     </div>
+    ${recentIncidentsHtml}
 </div>`;
     }
 
@@ -725,22 +837,23 @@
             html += `
 <div class="incidents-empty">
     <div class="ei-icon">🎉</div>
-    <div>No incidents in the last 7 days</div>
+    <div>No incidents recently</div>
     <div style="margin-top:6px; font-size:12px; color:var(--text-faint)">All systems have been running smoothly</div>
 </div>`;
         } else {
             outages.forEach(o => {
-                const dur = fmtDuration(o.duration_seconds);
-                const startFmt = fmtDateTime(o.start);
-                const endFmt = o.is_ongoing ? 'Ongoing' : fmtDateTime(o.end);
+                const isOngoing = o.status === 'open';
+                const dur = isOngoing ? '—' : fmtDuration(o.duration_seconds);
+                const startFmt = fmtDateTime(o.start_time);
+                const endFmt = isOngoing ? 'Ongoing' : fmtDateTime(o.end_time);
 
                 html += `
 <div class="incident-row">
-    <div class="incident-icon">${o.is_ongoing ? '🔴' : '⚠️'}</div>
+    <div class="incident-icon">${isOngoing ? '🔴' : '⚠️'}</div>
     <div class="incident-body">
         <div class="incident-service">
             ${escHtml(o.service_name)}
-            ${o.is_ongoing ? '<span class="ongoing-badge">Ongoing</span>' : ''}
+            ${isOngoing ? '<span class="ongoing-badge">Ongoing</span>' : ''}
         </div>
         <div class="incident-time">${escHtml(startFmt)} → ${escHtml(endFmt)}</div>
     </div>
@@ -748,7 +861,6 @@
 </div>`;
             });
         }
-
         html += `</div>`;
         return html;
     }
@@ -764,14 +876,150 @@
         </div>
     </div>
 </div>`;
-        document.getElementById('last-updated-text').textContent = 'Connection error';
+        const lu = document.getElementById('last-updated-text');
+        if (lu) lu.textContent = 'Connection error';
+    }
+
+    // ── Modals ─────────────────────────────────────────────
+    let currentModalService = null;
+    let currentModalOffset = 0;
+    const MODAL_LIMIT = 10;
+
+    async function openHistoryModal(serviceName) {
+        currentModalService = serviceName;
+        currentModalOffset = 0;
+        
+        let modal = document.getElementById('history-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'history-modal';
+            modal.setAttribute('role', 'dialog');
+            modal.setAttribute('aria-modal', 'true');
+            modal.setAttribute('aria-labelledby', 'modal-title');
+            modal.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px;';
+            modal.innerHTML = `
+                <div style="background: var(--surface); width: 100%; max-width: 500px; border-radius: var(--radius-lg); box-shadow: var(--shadow-md); display: flex; flex-direction: column; max-height: 80vh;">
+                    <div style="padding: 16px 20px; border-bottom: 1px solid var(--border-soft); display: flex; justify-content: space-between; align-items: center;">
+                        <h2 id="modal-title" style="font-size: 16px; margin: 0;">History: <span id="modal-service-name"></span></h2>
+                        <button onclick="closeHistoryModal()" aria-label="Close modal" style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted);">&times;</button>
+                    </div>
+                    <div id="modal-content" style="padding: 20px; overflow-y: auto; flex: 1;">Loading...</div>
+                    <div style="padding: 16px 20px; border-top: 1px solid var(--border-soft); display: flex; justify-content: space-between; align-items: center;">
+                        <button id="modal-prev" onclick="changeHistoryPage(-1)" disabled style="padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface-2); color: var(--text); cursor: pointer;">Previous</button>
+                        <span id="modal-page-info" style="font-size: 13px; color: var(--text-muted);"></span>
+                        <button id="modal-next" onclick="changeHistoryPage(1)" disabled style="padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface-2); color: var(--text); cursor: pointer;">Next</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && document.getElementById('history-modal') && document.getElementById('history-modal').style.display !== 'none') {
+                    closeHistoryModal();
+                }
+            });
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) closeHistoryModal();
+            });
+        }
+        
+        
+        document.getElementById('modal-service-name').textContent = serviceName;
+        modal.style.display = 'flex';
+        
+        // Focus trap
+        const focusableElements = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+        const firstFocusable = modal.querySelectorAll(focusableElements)[0];
+        const focusableContent = modal.querySelectorAll(focusableElements);
+        const lastFocusable = focusableContent[focusableContent.length - 1];
+        
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Tab' && modal.style.display !== 'none') {
+                const focusables = modal.querySelectorAll(focusableElements);
+                if (focusables.length === 0) return;
+                const first = focusables[0];
+                const last = focusables[focusables.length - 1];
+                if (e.shiftKey) {
+                    if (document.activeElement === first) {
+                        last.focus();
+                        e.preventDefault();
+                    }
+                } else {
+                    if (document.activeElement === last) {
+                        first.focus();
+                        e.preventDefault();
+                    }
+                }
+            }
+        });
+        
+        if (firstFocusable) {
+            firstFocusable.focus();
+        }
+        
+        await loadHistoryPage();
+    }
+
+    function closeHistoryModal() {
+        const modal = document.getElementById('history-modal');
+        if (modal) modal.style.display = 'none';
+        currentModalService = null;
+    }
+
+    async function changeHistoryPage(dir) {
+        currentModalOffset += dir * MODAL_LIMIT;
+        if (currentModalOffset < 0) currentModalOffset = 0;
+        await loadHistoryPage();
+    }
+
+    async function loadHistoryPage() {
+        const content = document.getElementById('modal-content');
+        const prevBtn = document.getElementById('modal-prev');
+        const nextBtn = document.getElementById('modal-next');
+        const pageInfo = document.getElementById('modal-page-info');
+        
+        content.innerHTML = 'Loading...';
+        prevBtn.disabled = true;
+        nextBtn.disabled = true;
+
+        try {
+            const url = `${API_BASE}/services/${currentModalService}/incidents?limit=${MODAL_LIMIT}&offset=${currentModalOffset}`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error('Failed to load');
+            const data = await res.json();
+            
+            const total = data.total || 0;
+            const incs = data.incidents || [];
+            
+            if (incs.length === 0) {
+                content.innerHTML = '<div style="text-align: center; color: var(--text-muted);">No incidents found.</div>';
+            } else {
+                content.innerHTML = incs.map(inc => `
+                    <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border-soft);">
+                        <strong style="color: ${inc.status === 'open' ? 'var(--down)' : 'var(--text)'}">
+                            ${inc.status === 'open' ? '🔴 Ongoing' : '⚫ Closed'}
+                        </strong><br/>
+                        <span style="font-size: 13px; color: var(--text-2);">
+                            ${fmtDateTime(inc.start_time)} &rarr; ${inc.status === 'closed' ? fmtDateTime(inc.end_time) : 'Now'}
+                        </span><br/>
+                        <span style="font-size: 12px; color: var(--text-muted);">Duration: ${inc.status === 'closed' ? fmtDuration(inc.duration_seconds) : '—'}</span>
+                    </div>
+                `).join('');
+            }
+            
+            pageInfo.textContent = `Showing ${currentModalOffset + 1} - ${Math.min(currentModalOffset + MODAL_LIMIT, Math.max(1, total))} of ${total}`;
+            prevBtn.disabled = currentModalOffset === 0;
+            nextBtn.disabled = (currentModalOffset + MODAL_LIMIT) >= total;
+            
+        } catch (e) {
+            content.innerHTML = `<div style="color: var(--down);">Error loading history: ${e.message}</div>`;
+        }
     }
 
     // ── Init ───────────────────────────────────────────────
     fetchStatus();
     setInterval(fetchStatus, 30000);
 
-    // Periodic "time ago" label refresh
     setInterval(() => {
         const el = document.getElementById('last-updated-text');
         if (el && window._lastUpdatedISO) {
@@ -785,15 +1033,9 @@
         const ws = new WebSocket(`${proto}//${location.host}/ws`);
         let debounceTimer = null;
 
-        ws.onopen = () => {
-            console.log('[WS] Connected');
-        };
-        ws.onclose = () => {
-            console.log('[WS] Disconnected, retrying in 5s…');
-            setTimeout(connectWS, 5000);
-        };
+        ws.onopen = () => console.log('[WS] Connected');
+        ws.onclose = () => setTimeout(connectWS, 5000);
         ws.onmessage = () => {
-            // Debounce — 2s interval'dan tez qayta fetch qilmaymiz
             if (debounceTimer) return;
             debounceTimer = setTimeout(() => {
                 debounceTimer = null;

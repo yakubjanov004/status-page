@@ -1,12 +1,12 @@
 # Self-Hosted Status Page
 
-A lightweight, self-hosted uptime monitoring and public status page system. Built with Go (Golang), SQLite, Alpine.js, and Tailwind CSS.
+A lightweight, self-hosted uptime monitoring and public status page system. Built with Go (Golang), SQLite, Vanilla JS, and Vanilla CSS.
 
 ## Features
 - **Auto-Discovery**: Scans Nginx and Systemd files to automatically find and monitor local projects!
 - **Project Grouping**: Groups Frontend and Backend components logically.
 - **HTTP/HTTPS & TCP Monitoring**: Monitor your API, website, or database.
-- **Public Status Page**: A beautiful, modern status page showing 7-day uptime history per component.
+- **Public Status Page**: A beautiful, modern status page showing 7-day uptime history per component, computed client-side via the incidents API using the /api/v1/ nginx proxy topology.
 - **Real-time Updates**: WebSocket integration pushes state changes to the UI without refreshing.
 - **Zero Dependencies**: Uses a pure Go SQLite driver (`modernc.org/sqlite`), no CGO required.
 - **Webhook Receiver**: Accept service up/down events via HTTP webhooks for incident tracking.
@@ -347,6 +347,5 @@ status-page/
 │   ├── dockerwatch.service     # Docker watcher unit
 │   ├── status-page.service     # Main status page unit
 │   └── nginx-status-page.conf  # Nginx config
-├── server's/system/     # Reference systemd unit files
 └── web/                 # Frontend assets
 ```
