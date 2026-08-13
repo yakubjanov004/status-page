@@ -46,6 +46,7 @@ service_for_unit() {
         tokpoint-frontend.service)  echo "Tokpoint"    ;;
         tokpoint-worker.service)    echo "Tokpoint"    ;;
         tokpoint-beat.service)      echo "Tokpoint"    ;;
+        datan.service)              echo "Datan"       ;;
         *)                          echo ""            ;;
     esac
     # tokpoint-docker.service excluded: handled by dockerwatch
@@ -59,7 +60,8 @@ odimrepo-frontend.service
 tokpoint-backend.service
 tokpoint-frontend.service
 tokpoint-worker.service
-tokpoint-beat.service"
+tokpoint-beat.service
+datan.service"
 
 printf '\n'
 printf '======================================================\n'
