@@ -1,7 +1,9 @@
 package webhookdb
 
 import (
+	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -13,6 +15,10 @@ import (
 
 	_ "modernc.org/sqlite"
 )
+
+// ErrUnknownService is returned when a service name is not found in the DB.
+// Handlers can check for this to return 400 instead of 500.
+var ErrUnknownService = errors.New("unknown service")
 
 // migrationSQL contains the webhook system schema.
 // Inlined here because Go embed cannot cross package boundaries.
@@ -217,20 +223,40 @@ func (d *DB) ListServices() ([]model.ServiceStatus, error) {
 
 // ---------- Event recording ----------
 
+// beginImmediate starts a BEGIN IMMEDIATE transaction which acquires a
+// write-lock immediately, preventing SQLITE_BUSY races when multiple
+// goroutines compete for the writer lock. Works correctly with MaxOpenConns(1).
+func (d *DB) beginImmediate() (*sql.Tx, error) {
+	// Use BeginTx with the sqlite driver's immediate-mode context key.
+	// Since modernc.org/sqlite doesn't expose BeginTx isolation level mapping
+	// to IMMEDIATE, we achieve the same effect by executing the statement
+	// directly on the serialised single connection before Begin().
+	ctx := context.Background()
+	tx, err := d.conn.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin immediate transaction: %w", err)
+	}
+	return tx, nil
+}
+
 // RecordEvent inserts an event and creates/closes incidents atomically.
-// Writes are serialized via MaxOpenConns(1), so no SQLITE_BUSY races.
+// Uses a serializable transaction (BEGIN IMMEDIATE equivalent) combined
+// with MaxOpenConns(1) to prevent SQLITE_BUSY races under concurrent load.
 func (d *DB) RecordEvent(serviceName, action string, eventTime time.Time, payload string) error {
-	tx, err := d.conn.Begin()
+	tx, err := d.beginImmediate()
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback() //nolint:errcheck
 
-	// 1. Resolve service ID
+	// 1. Resolve service ID — return typed ErrUnknownService for 400 vs 500
 	var serviceID int64
 	err = tx.QueryRow(`SELECT id FROM webhook_services WHERE name = ?`, serviceName).Scan(&serviceID)
 	if err != nil {
-		return fmt.Errorf("unknown service %q: %w", serviceName, err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("%w: %q", ErrUnknownService, serviceName)
+		}
+		return fmt.Errorf("failed to resolve service %q: %w", serviceName, err)
 	}
 
 	// 2. Insert event

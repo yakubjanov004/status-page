@@ -1,9 +1,12 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"strconv"
 	"time"
@@ -13,6 +16,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 )
+
+// contextKey is a private type for context keys in this package.
+type contextKey string
+
+const ctxRequestID contextKey = "request_id"
 
 // Handler holds the webhook HTTP handlers and their dependencies.
 type Handler struct {
@@ -33,13 +41,37 @@ const maxServiceNameLen = 64
 
 // ---------- Middleware ----------
 
+// requestIDMiddleware reads X-Request-Id from the incoming request (if present)
+// or generates a short random ID, then stores it in the context and echoes it
+// in the X-Request-Id response header for end-to-end traceability.
+func requestIDMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reqID := r.Header.Get("X-Request-Id")
+		if reqID == "" {
+			reqID = fmt.Sprintf("wh-%08x", rand.Uint32())
+		}
+		w.Header().Set("X-Request-Id", reqID)
+		ctx := context.WithValue(r.Context(), ctxRequestID, reqID)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// getRequestID retrieves the request ID from the context.
+func getRequestID(r *http.Request) string {
+	if id, ok := r.Context().Value(ctxRequestID).(string); ok {
+		return id
+	}
+	return ""
+}
+
 // requireToken validates the X-Hook-Token header.
 func (h *Handler) requireToken(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := r.Header.Get("X-Hook-Token")
 		if token == "" || token != h.hookToken {
 			writeJSON(w, http.StatusUnauthorized, model.ErrorResponse{
-				Error: "unauthorized: invalid or missing X-Hook-Token",
+				Error:     "unauthorized: invalid or missing X-Hook-Token",
+				RequestID: getRequestID(r),
 			})
 			return
 		}
@@ -51,8 +83,7 @@ func (h *Handler) requireToken(next http.Handler) http.Handler {
 
 // HandleWebhook processes incoming service up/down events.
 func (h *Handler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
-	// Generate a simple request ID for logging
-	reqID := fmt.Sprintf("req-%d", time.Now().UnixNano())
+	reqID := getRequestID(r)
 
 	// Limit body size
 	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
@@ -104,7 +135,15 @@ func (h *Handler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 
 	// Record event (creates/closes incidents atomically)
 	if err := h.db.RecordEvent(req.Service, req.Action, eventTime, payload); err != nil {
-		log.Printf("[webhook] %s: failed to record event: %v", reqID, err)
+		log.Printf("[webhook] %s: failed to record event for %q: %v", reqID, req.Service, err)
+		// Unknown service name is a client error (400), not a server error (500)
+		if errors.Is(err, webhookdb.ErrUnknownService) {
+			writeJSON(w, http.StatusBadRequest, model.ErrorResponse{
+				Error:     fmt.Sprintf("unknown service %q: not in the list of known services", req.Service),
+				RequestID: reqID,
+			})
+			return
+		}
 		writeJSON(w, http.StatusInternalServerError, model.ErrorResponse{
 			Error:     "failed to record event",
 			RequestID: reqID,

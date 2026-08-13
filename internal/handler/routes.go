@@ -13,6 +13,7 @@ func SetupRoutes(r *chi.Mux, db *webhookdb.DB, hookToken string) {
 
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RealIP)
+	r.Use(requestIDMiddleware) // injects/echoes X-Request-Id on every response
 
 	// Health check (no auth)
 	r.Get("/healthz", h.HandleHealthz)
@@ -31,3 +32,4 @@ func SetupRoutes(r *chi.Mux, db *webhookdb.DB, hookToken string) {
 		api.Get("/services/{name}/uptime", h.HandleUptime)
 	})
 }
+

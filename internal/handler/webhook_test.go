@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 )
+
 
 // setupTestDB creates a temporary SQLite database for testing.
 func setupTestDB(t *testing.T) *webhookdb.DB {
@@ -249,8 +251,14 @@ func TestWebhook_UnknownService(t *testing.T) {
 		Action:  "down",
 		Time:    time.Now().UTC().Format(time.RFC3339),
 	})
-	if w.Code != http.StatusInternalServerError {
-		t.Errorf("expected 500 for unknown service, got %d", w.Code)
+	// Unknown service is a client error: webhook sender must fix the name
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for unknown service, got %d", w.Code)
+	}
+	// Verify the error message is helpful
+	body := w.Body.String()
+	if !strings.Contains(body, "NonExistentService") {
+		t.Errorf("expected error body to contain service name, got: %s", body)
 	}
 }
 
