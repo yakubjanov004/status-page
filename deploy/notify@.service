@@ -1,0 +1,8 @@
+[Unit]
+Description=Service Failure Notification for %i
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/default/service-notify
+ExecStart=/usr/local/bin/service-notify.sh down %i

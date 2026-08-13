@@ -1,0 +1,21 @@
+[Unit]
+Description=Docker Container Watcher for Tokpoint
+Documentation=https://github.com/yakubjanov004/status-page
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+
+[Service]
+Type=simple
+# Requires access to /var/run/docker.sock — must be root or in docker group
+User=root
+ExecStart=/usr/local/bin/docker-watcher
+Restart=always
+RestartSec=10
+EnvironmentFile=/opt/status-webhook/.env
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=docker-watcher
+
+[Install]
+WantedBy=multi-user.target
