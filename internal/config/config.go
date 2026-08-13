@@ -8,8 +8,10 @@ import (
 )
 
 type Config struct {
-	Port   string
-	DBPath string
+	Port     string
+	DBPath   string
+	SiteName string
+	SiteURL  string
 }
 
 func Load() *Config {
@@ -28,8 +30,20 @@ func Load() *Config {
 		dbPath = "./data/status.db"
 	}
 
+	siteName := os.Getenv("SITE_NAME")
+	if siteName == "" {
+		siteName = "Darrov Status"
+	}
+
+	siteURL := os.Getenv("SITE_URL")
+	if siteURL == "" {
+		siteURL = "https://status.darrov.uz"
+	}
+
 	return &Config{
-		Port:   port,
-		DBPath: dbPath,
+		Port:     port,
+		DBPath:   dbPath,
+		SiteName: siteName,
+		SiteURL:  siteURL,
 	}
 }

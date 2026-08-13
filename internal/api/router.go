@@ -21,8 +21,8 @@ func NewRouter(cfg *config.Config) *chi.Mux {
 		AllowedHeaders: []string{"Accept", "Content-Type"},
 	}))
 
-	// Public API
-	r.Get("/api/public/status", GetPublicStatusHandler)
+	// Public API — cfg closure orqali handler'ga uzatiladi
+	r.Get("/api/public/status", GetPublicStatusHandler(cfg))
 
 	// WebSocket
 	r.Get("/ws", websocket.GlobalHub.HandleWebSocket)

@@ -1,278 +1,807 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>System Status — Darrov</title>
-    <meta name="description" content="Real-time system status monitoring for Darrov services">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <title>Darrov Status — All Systems Operational</title>
+    <meta name="description" content="Real-time status and uptime monitoring for Darrov services. Check the operational status of all systems.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        *{box-sizing:border-box;margin:0;padding:0}
-        body{font-family:'Inter',sans-serif;background:#050a15;color:#e2e8f0}
+        /* ── Design Tokens ─────────────────────────────────── */
+        :root {
+            --bg:          #f8f9fa;
+            --surface:     #ffffff;
+            --surface-2:   #f4f4f6;
+            --border:      #e5e7eb;
+            --border-soft: #f0f0f2;
+            --text:        #111827;
+            --text-2:      #374151;
+            --text-muted:  #6b7280;
+            --text-faint:  #9ca3af;
 
-        .page-bg{
-            background:
-                radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99,102,241,0.06), transparent),
-                radial-gradient(ellipse 60% 40% at 80% 100%, rgba(16,185,129,0.03), transparent);
+            --up:          #10b981;
+            --up-bg:       #ecfdf5;
+            --up-border:   #a7f3d0;
+            --up-text:     #065f46;
+
+            --warn:        #f59e0b;
+            --warn-bg:     #fffbeb;
+            --warn-border: #fde68a;
+            --warn-text:   #78350f;
+
+            --down:        #ef4444;
+            --down-bg:     #fef2f2;
+            --down-border: #fecaca;
+            --down-text:   #991b1b;
+
+            --accent:      #6366f1;
+            --accent-2:    #8b5cf6;
+
+            --radius-sm:   6px;
+            --radius-md:   10px;
+            --radius-lg:   14px;
+
+            --shadow-sm:   0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+            --shadow-md:   0 4px 16px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04);
+
+            --transition:  0.18s ease;
         }
 
-        .glass{
-            background:rgba(15,23,42,0.6);
-            backdrop-filter:blur(24px);
-            border:1px solid rgba(255,255,255,0.05);
+        [data-theme="dark"] {
+            --bg:          #0d1117;
+            --surface:     #161b22;
+            --surface-2:   #1c2128;
+            --border:      #30363d;
+            --border-soft: #21262d;
+            --text:        #e6edf3;
+            --text-2:      #c9d1d9;
+            --text-muted:  #8b949e;
+            --text-faint:  #6e7681;
+
+            --up-bg:       #0d2b1e;
+            --up-border:   #1a4731;
+            --up-text:     #3fb950;
+
+            --warn-bg:     #2b1e08;
+            --warn-border: #5a3e0a;
+            --warn-text:   #d29922;
+
+            --down-bg:     #2b1218;
+            --down-border: #5a1c24;
+            --down-text:   #f85149;
+
+            --shadow-sm:   0 1px 3px rgba(0,0,0,0.3);
+            --shadow-md:   0 4px 16px rgba(0,0,0,0.4);
         }
 
-        /* Pulse dots */
-        @keyframes p-g{0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}50%{box-shadow:0 0 0 6px rgba(16,185,129,0.2)}}
-        @keyframes p-r{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}50%{box-shadow:0 0 0 6px rgba(239,68,68,0.2)}}
-        @keyframes p-y{0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,0)}50%{box-shadow:0 0 0 6px rgba(245,158,11,0.2)}}
-        .dot-up{background:#10b981;animation:p-g 2.5s infinite}
-        .dot-down{background:#ef4444;animation:p-r 2.5s infinite}
-        .dot-warn{background:#f59e0b;animation:p-y 2.5s infinite}
+        /* ── Reset ─────────────────────────────────────────── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 14px;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            transition: background var(--transition), color var(--transition);
+        }
 
-        /* History bars */
-        .hbar{flex:1;min-width:0;border-radius:3px;transition:transform .1s,filter .1s;cursor:default;position:relative}
-        .hbar:hover{transform:scaleY(1.2);filter:brightness(1.3)}
-        .tip{visibility:hidden;opacity:0;transition:opacity .12s,visibility .12s}
-        .hbar:hover .tip{visibility:visible;opacity:1}
+        /* ── Layout ────────────────────────────────────────── */
+        .wrap { max-width: 860px; margin: 0 auto; padding: 0 20px; }
 
-        /* Skeleton */
-        @keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
-        .skel{background:linear-gradient(90deg,rgba(30,41,59,.7) 25%,rgba(51,65,85,.3) 50%,rgba(30,41,59,.7) 75%);background-size:400px 100%;animation:shimmer 1.2s infinite;border-radius:14px}
+        /* ── Header ────────────────────────────────────────── */
+        .site-header {
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+            position: sticky; top: 0; z-index: 100;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+        .header-inner {
+            display: flex; align-items: center; justify-content: space-between;
+            height: 56px;
+        }
+        .logo {
+            display: flex; align-items: center; gap: 10px;
+            text-decoration: none; color: var(--text);
+        }
+        .logo-mark {
+            width: 30px; height: 30px; border-radius: 8px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 800; font-size: 14px; color: #fff;
+            box-shadow: 0 2px 8px rgba(99,102,241,0.35);
+        }
+        .logo-text { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }
 
-        /* Fade in */
-        @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-        .fade-up{animation:fadeUp .3s ease forwards}
+        .header-right { display: flex; align-items: center; gap: 12px; }
+        .last-updated {
+            font-size: 12px; color: var(--text-faint);
+            display: flex; align-items: center; gap: 5px;
+        }
+        .live-dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: var(--up); display: inline-block;
+            animation: pulse-dot 2s infinite;
+        }
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+        }
 
-        /* Badge */
-        .badge{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 10px;border-radius:999px;white-space:nowrap}
-        .badge-up{background:rgba(16,185,129,.1);color:#34d399}
-        .badge-down{background:rgba(239,68,68,.1);color:#f87171}
-        .badge-part{background:rgba(245,158,11,.1);color:#fbbf24}
+        .theme-btn {
+            width: 32px; height: 32px; border-radius: var(--radius-sm);
+            border: 1px solid var(--border); background: var(--surface-2);
+            color: var(--text-muted); cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 15px; transition: all var(--transition);
+        }
+        .theme-btn:hover { background: var(--border); color: var(--text); }
 
-        /* Bar colors by uptime % */
-        .bar-100{background:#10b981}
-        .bar-90{background:#22c55e}
-        .bar-70{background:#f59e0b}
-        .bar-50{background:#f97316}
-        .bar-0{background:#ef4444}
-        .bar-none{background:rgba(51,65,85,0.4)}
+        /* ── Page body ─────────────────────────────────────── */
+        .page-body { padding: 36px 0 60px; }
+
+        /* ── Status Banner ─────────────────────────────────── */
+        .status-banner {
+            border-radius: var(--radius-lg);
+            padding: 24px 28px;
+            margin-bottom: 28px;
+            border: 1px solid;
+            position: relative; overflow: hidden;
+            transition: all var(--transition);
+        }
+        .status-banner::before {
+            content: '';
+            position: absolute; inset: 0;
+            opacity: 0.05;
+            background: radial-gradient(ellipse at top left, currentColor 0%, transparent 70%);
+            pointer-events: none;
+        }
+        .status-banner.operational {
+            background: var(--up-bg); border-color: var(--up-border); color: var(--up-text);
+        }
+        .status-banner.degraded {
+            background: var(--warn-bg); border-color: var(--warn-border); color: var(--warn-text);
+        }
+        .status-banner.outage {
+            background: var(--down-bg); border-color: var(--down-border); color: var(--down-text);
+        }
+
+        .banner-body { display: flex; align-items: center; gap: 14px; }
+        .banner-icon { font-size: 28px; flex-shrink: 0; line-height: 1; }
+        .banner-title { font-size: 20px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 3px; }
+        .banner-sub { font-size: 13px; opacity: 0.8; }
+
+        /* ── Stats Row ─────────────────────────────────────── */
+        .stats-row {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+            margin-bottom: 28px;
+        }
+        .stat-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius-md); padding: 18px 20px;
+            box-shadow: var(--shadow-sm);
+            transition: box-shadow var(--transition);
+        }
+        .stat-card:hover { box-shadow: var(--shadow-md); }
+        .stat-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); margin-bottom: 6px; }
+        .stat-value { font-size: 26px; font-weight: 800; letter-spacing: -0.8px; font-variant-numeric: tabular-nums; color: var(--text); }
+        .stat-value span { font-size: 14px; font-weight: 500; color: var(--text-muted); letter-spacing: 0; }
+        .stat-sub { font-size: 11px; color: var(--text-faint); margin-top: 3px; }
+
+        /* ── Status Card ───────────────────────────────────── */
+        .status-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius-lg); box-shadow: var(--shadow-sm);
+            overflow: hidden; margin-bottom: 20px;
+        }
+
+        .card-header {
+            padding: 18px 24px; border-bottom: 1px solid var(--border-soft);
+            display: flex; justify-content: space-between; align-items: center;
+            background: var(--surface);
+        }
+        .card-title { font-size: 15px; font-weight: 700; letter-spacing: -0.2px; }
+        .date-range { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 4px; }
+
+        /* Project group */
+        .project-group { border-bottom: 1px solid var(--border-soft); }
+        .project-group:last-child { border-bottom: none; }
+
+        .project-label {
+            padding: 10px 24px; font-size: 11px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.6px;
+            color: var(--text-faint); background: var(--surface-2);
+            border-bottom: 1px solid var(--border-soft);
+        }
+
+        /* Component row */
+        .comp-row {
+            padding: 18px 24px;
+            border-bottom: 1px solid var(--border-soft);
+            transition: background var(--transition);
+        }
+        .comp-row:last-child { border-bottom: none; }
+        .comp-row:hover { background: var(--surface-2); }
+
+        .comp-info {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 12px;
+        }
+        .comp-left { display: flex; align-items: center; gap: 8px; }
+        .status-dot {
+            width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+            transition: background var(--transition);
+        }
+        .status-dot.up   { background: var(--up); box-shadow: 0 0 0 2px rgba(16,185,129,0.2); }
+        .status-dot.down { background: var(--down); box-shadow: 0 0 0 2px rgba(239,68,68,0.2); animation: pulse-down 1.5s infinite; }
+        .status-dot.warn { background: var(--warn); box-shadow: 0 0 0 2px rgba(245,158,11,0.2); }
+        @keyframes pulse-down {
+            0%, 100% { box-shadow: 0 0 0 2px rgba(239,68,68,0.2); }
+            50% { box-shadow: 0 0 0 5px rgba(239,68,68,0.05); }
+        }
+
+        .comp-name { font-size: 14px; font-weight: 500; color: var(--text-2); }
+        .comp-status-badge {
+            font-size: 11px; font-weight: 600; padding: 2px 8px;
+            border-radius: 20px; background: var(--up-bg); color: var(--up-text);
+            border: 1px solid var(--up-border);
+        }
+        .comp-status-badge.down { background: var(--down-bg); color: var(--down-text); border-color: var(--down-border); }
+
+        .comp-right { display: flex; align-items: center; gap: 14px; }
+        .comp-meta { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; text-align: right; }
+        .comp-meta strong { color: var(--text); font-weight: 600; }
+        .latency-badge {
+            font-size: 11px; padding: 2px 7px; border-radius: 4px;
+            background: var(--surface-2); color: var(--text-muted);
+            border: 1px solid var(--border); font-variant-numeric: tabular-nums;
+        }
+
+        /* ── Bar Chart ─────────────────────────────────────── */
+        .bars-wrap {
+            display: flex; gap: 3px; height: 32px; align-items: flex-end;
+        }
+        .bar {
+            flex: 1; min-width: 0; border-radius: 3px;
+            height: 100%; position: relative; cursor: pointer;
+            transition: opacity var(--transition), transform 0.1s ease;
+        }
+        .bar:hover { opacity: 0.75; transform: scaleY(1.06); transform-origin: bottom; }
+        .bar.c-100  { background: var(--up); }
+        .bar.c-good { background: #34d399; }
+        .bar.c-warn { background: var(--warn); }
+        .bar.c-bad  { background: var(--down); }
+        .bar.c-none { background: var(--border); opacity: 0.6; }
+
+        /* Tooltip */
+        .bar-tip {
+            display: none;
+            position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%);
+            background: var(--text); color: var(--surface);
+            padding: 10px 14px; border-radius: var(--radius-md);
+            font-size: 12px; white-space: nowrap; min-width: 200px;
+            box-shadow: var(--shadow-md); z-index: 200; text-align: left;
+            pointer-events: none;
+        }
+        .bar-tip::after {
+            content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+            border: 5px solid transparent; border-top-color: var(--text);
+        }
+        .bar:hover .bar-tip { display: block; }
+        .tip-date { color: rgba(255,255,255,0.55); font-size: 11px; margin-bottom: 6px; }
+        [data-theme="dark"] .tip-date { color: rgba(0,0,0,0.5); }
+        .tip-uptime { font-weight: 700; font-size: 13px; margin-bottom: 4px; }
+        .tip-outage { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.12); gap: 12px; }
+        [data-theme="dark"] .tip-outage { border-top-color: rgba(0,0,0,0.15); }
+        .tip-outage-label { color: #fbbf24; font-weight: 600; }
+        .tip-outage-time { color: rgba(255,255,255,0.7); font-size: 11px; margin-top: 2px; }
+        [data-theme="dark"] .tip-outage-time { color: rgba(0,0,0,0.5); }
+        .tip-no-incidents { color: rgba(255,255,255,0.65); font-size: 11px; margin-top: 4px; }
+        [data-theme="dark"] .tip-no-incidents { color: rgba(0,0,0,0.5); }
+
+        .bars-label {
+            display: flex; justify-content: space-between;
+            font-size: 10px; color: var(--text-faint); margin-top: 6px;
+        }
+
+        /* ── Recent Outages Section ────────────────────────── */
+        .incidents-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius-lg); box-shadow: var(--shadow-sm);
+            overflow: hidden; margin-bottom: 20px;
+        }
+        .incidents-empty {
+            padding: 36px 24px; text-align: center;
+            color: var(--text-muted); font-size: 13px;
+        }
+        .incidents-empty .ei-icon { font-size: 32px; margin-bottom: 10px; }
+
+        .incident-row {
+            display: flex; align-items: flex-start; gap: 14px;
+            padding: 16px 24px; border-bottom: 1px solid var(--border-soft);
+            transition: background var(--transition);
+        }
+        .incident-row:last-child { border-bottom: none; }
+        .incident-row:hover { background: var(--surface-2); }
+
+        .incident-icon { font-size: 18px; margin-top: 1px; flex-shrink: 0; }
+        .incident-body { flex: 1; min-width: 0; }
+        .incident-service {
+            font-weight: 600; font-size: 13px; color: var(--text);
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+        }
+        .ongoing-badge {
+            font-size: 10px; font-weight: 700; padding: 2px 7px;
+            background: var(--down-bg); color: var(--down-text);
+            border: 1px solid var(--down-border); border-radius: 20px;
+            text-transform: uppercase; letter-spacing: 0.4px;
+            animation: fade-ongoing 1.5s infinite;
+        }
+        @keyframes fade-ongoing { 0%,100%{opacity:1} 50%{opacity:0.55} }
+        .incident-time { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+        .incident-duration {
+            font-size: 13px; font-weight: 600; color: var(--text-muted);
+            white-space: nowrap; flex-shrink: 0; font-variant-numeric: tabular-nums;
+        }
+
+        /* ── Skeleton ──────────────────────────────────────── */
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        .skeleton {
+            background: linear-gradient(90deg,
+                var(--border-soft) 25%,
+                var(--border) 50%,
+                var(--border-soft) 75%
+            );
+            background-size: 200% 100%;
+            animation: shimmer 1.6s infinite;
+            border-radius: var(--radius-md);
+        }
+        .skel-banner { height: 90px; margin-bottom: 28px; }
+        .skel-stats { height: 88px; margin-bottom: 28px; border-radius: var(--radius-lg); }
+        .skel-card { height: 380px; }
+
+        /* ── Footer ────────────────────────────────────────── */
+        .site-footer {
+            border-top: 1px solid var(--border);
+            padding: 24px 0 32px;
+            text-align: center; font-size: 12px; color: var(--text-faint);
+        }
+        .site-footer a { color: var(--text-muted); text-decoration: none; font-weight: 500; }
+        .site-footer a:hover { color: var(--text); text-decoration: underline; }
+
+        /* ── Responsive ────────────────────────────────────── */
+        @media (max-width: 600px) {
+            .stats-row { grid-template-columns: 1fr; }
+            .comp-right { flex-direction: column; align-items: flex-end; gap: 6px; }
+            .header-right .last-updated { display: none; }
+            .incident-duration { font-size: 12px; }
+        }
+        @media (max-width: 420px) {
+            .wrap { padding: 0 14px; }
+            .comp-row { padding: 14px 16px; }
+            .card-header { padding: 14px 16px; }
+            .bars-wrap { height: 26px; }
+        }
+
+        /* ── Animations ────────────────────────────────────── */
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(6px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in { animation: fade-in 0.3s ease both; }
     </style>
 </head>
-<body class="page-bg min-h-screen flex flex-col" x-data="statusApp()" x-init="init()">
+<body>
 
-    <!-- Header -->
-    <header class="w-full py-4 px-5 md:px-8 flex items-center justify-between border-b border-white/5">
-        <div class="flex items-center gap-2.5">
-            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center font-black text-white text-sm shadow-lg shadow-indigo-500/25">D</div>
-            <span class="font-bold text-slate-100 text-[15px] tracking-tight">Darrov Status</span>
-        </div>
-        <div class="flex items-center gap-1.5 text-[11px] text-slate-500">
-            <span class="w-1.5 h-1.5 rounded-full transition-colors" :class="live ? 'bg-emerald-400' : 'bg-slate-600'"></span>
-            <span x-text="live ? 'Live' : 'Connecting...'"></span>
-        </div>
-    </header>
-
-    <main class="flex-1 max-w-2xl w-full mx-auto px-4 py-8 space-y-5">
-
-        <!-- Skeleton -->
-        <template x-if="loading">
-            <div class="space-y-4">
-                <div class="skel h-[68px] w-full"></div>
-                <div class="skel h-[160px] w-full"></div>
-                <div class="skel h-[160px] w-full"></div>
-                <div class="skel h-[120px] w-full"></div>
-                <div class="skel h-[120px] w-full"></div>
-            </div>
-        </template>
-
-        <template x-if="!loading">
-            <div class="space-y-4 fade-up">
-
-                <!-- Overall Banner -->
-                <div class="glass rounded-2xl px-5 py-4 flex items-center justify-between"
-                     :class="bannerBorder()"
-                     :style="bannerGlow()">
-                    <div class="flex items-center gap-3">
-                        <div class="w-3 h-3 rounded-full shrink-0" :class="bannerDot()"></div>
-                        <div>
-                            <div class="font-bold text-white text-[17px] leading-tight" x-text="data.status || 'Loading...'"></div>
-                            <div class="text-[11px] text-slate-500 mt-0.5" x-text="updated"></div>
-                        </div>
-                    </div>
+<!-- Header -->
+<header class="site-header">
+    <div class="wrap">
+        <div class="header-inner">
+            <a href="/" class="logo" id="site-logo">
+                <div class="logo-mark">D</div>
+                <span class="logo-text" id="logo-name">Darrov Status</span>
+            </a>
+            <div class="header-right">
+                <div class="last-updated" id="last-updated-label">
+                    <span class="live-dot"></span>
+                    <span id="last-updated-text">Loading…</span>
                 </div>
-
-                <!-- Projects -->
-                <template x-for="(proj, pi) in data.projects" :key="proj.id">
-                    <div class="glass rounded-2xl overflow-hidden fade-up" :style="'animation-delay:' + (pi*50) + 'ms'">
-
-                        <!-- Project header -->
-                        <div class="px-5 py-3.5 flex items-center justify-between border-b border-white/[0.04]">
-                            <div class="flex items-center gap-2.5">
-                                <div class="w-2 h-2 rounded-full shrink-0" :class="projDot(proj)"></div>
-                                <span class="font-bold text-white text-[15px]" x-text="proj.name"></span>
-                            </div>
-                            <span class="badge" :class="projBadgeClass(proj)" x-text="projLabel(proj)"></span>
-                        </div>
-
-                        <!-- Components -->
-                        <div class="divide-y divide-white/[0.03]">
-                            <template x-for="(c, ci) in proj.components" :key="ci">
-                                <div class="px-5 py-3.5">
-                                    <div class="flex items-center justify-between mb-2">
-                                        <div class="flex items-center gap-2">
-                                            <div class="w-1.5 h-1.5 rounded-full" :class="c.is_up ? 'bg-emerald-400' : 'bg-red-400'"></div>
-                                            <span class="text-[13px] font-semibold text-slate-200" x-text="c.name"></span>
-                                            <template x-if="c.latency > 0 && c.is_up">
-                                                <span class="text-[10px] text-slate-500 font-mono" x-text="c.latency + 'ms'"></span>
-                                            </template>
-                                        </div>
-                                        <span class="text-[11px] font-bold tabular-nums"
-                                              :class="uptimeColor(c.uptime_pct)"
-                                              x-text="c.uptime_pct.toFixed(1) + '%'"></span>
-                                    </div>
-
-                                    <!-- 7-day bars -->
-                                    <div class="flex gap-[2px] items-end h-[26px]">
-                                        <template x-for="(d, di) in c.history" :key="di">
-                                            <div class="hbar h-full" :class="barClass(d)">
-                                                <div class="tip absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1 bg-slate-900/95 border border-white/10 text-[10px] text-white rounded-lg shadow-xl whitespace-nowrap z-30">
-                                                    <span x-text="fmtDate(d.date)"></span>
-                                                    <span class="ml-1 font-bold" :class="d.is_up ? 'text-emerald-400' : 'text-red-400'" x-text="d.pct !== undefined ? d.pct.toFixed(0) + '%' : (d.is_up ? 'Up' : 'Down')"></span>
-                                                </div>
-                                            </div>
-                                        </template>
-                                    </div>
-                                    <div class="flex justify-between text-[10px] text-slate-600 mt-1">
-                                        <span>7 days ago</span>
-                                        <span>Today</span>
-                                    </div>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-                </template>
-
-                <!-- Empty state -->
-                <template x-if="data.projects && data.projects.length === 0">
-                    <div class="glass rounded-2xl px-5 py-14 text-center text-slate-500">
-                        <div class="text-3xl mb-2">📡</div>
-                        <div class="font-medium text-sm">No services configured</div>
-                    </div>
-                </template>
+                <button class="theme-btn" id="theme-toggle" title="Toggle theme" aria-label="Toggle dark/light theme">🌙</button>
             </div>
-        </template>
-    </main>
+        </div>
+    </div>
+</header>
 
-    <footer class="text-center text-[11px] text-slate-700 py-6 border-t border-white/5">
-        Powered by <span class="text-slate-500 font-medium">Darrov Monitoring</span>
-    </footer>
+<!-- Main -->
+<main>
+    <div class="wrap">
+        <div class="page-body">
+            <div id="app-root">
+                <!-- Skeleton -->
+                <div class="skeleton skel-banner"></div>
+                <div class="skeleton skel-stats"></div>
+                <div class="skeleton skel-card"></div>
+            </div>
+        </div>
+    </div>
+</main>
 
-    <script>
-    document.addEventListener('alpine:init', () => {
-        Alpine.data('statusApp', () => ({
-            data: { projects: [], status: '' },
-            loading: true,
-            live: false,
-            ws: null,
-            updated: '',
-            _debounce: null,
+<!-- Footer -->
+<footer class="site-footer">
+    <div class="wrap">
+        Powered by <a href="https://status.darrov.uz" id="footer-link">Darrov Status Monitor</a>
+        &nbsp;·&nbsp;
+        <span id="footer-updated">Updated just now</span>
+    </div>
+</footer>
 
-            init() {
-                this.fetchData();
-                this.connectWS();
-                setInterval(() => this.fetchData(), 30000);
-            },
+<script>
+    'use strict';
 
-            async fetchData() {
-                try {
-                    const r = await fetch('/api/public/status');
-                    if (!r.ok) throw new Error(r.status);
-                    this.data = await r.json();
-                    this.updated = 'Updated ' + new Date().toLocaleTimeString();
-                } catch(e) {
-                    this.data.status = 'Connection Error';
-                } finally { this.loading = false; }
-            },
+    const API_URL = '/api/public/status';
+    const root = document.getElementById('app-root');
 
-            connectWS() {
-                const p = location.protocol === 'https:' ? 'wss:' : 'ws:';
-                this.ws = new WebSocket(`${p}//${location.host}/ws`);
-                this.ws.onopen  = () => this.live = true;
-                this.ws.onclose = () => { this.live = false; setTimeout(() => this.connectWS(), 5000); };
-                this.ws.onerror = () => this.live = false;
-                this.ws.onmessage = () => {
-                    // Debounce — 2 soniya ichida bitta fetch
-                    if (this._debounce) return;
-                    this._debounce = setTimeout(() => { this._debounce = null; }, 2000);
-                    this.fetchData();
-                };
-            },
+    // ── Theme ──────────────────────────────────────────────
+    const themeBtn = document.getElementById('theme-toggle');
+    const html = document.documentElement;
+    const saved = localStorage.getItem('theme') || 'light';
+    html.setAttribute('data-theme', saved);
+    themeBtn.textContent = saved === 'dark' ? '☀️' : '🌙';
 
-            // Banner helpers
-            bannerBorder() {
-                const s = this.data.status || '';
-                if (s.includes('Operational')) return 'border-emerald-500/15';
-                if (s.includes('Partial') || s.includes('Degraded')) return 'border-amber-500/15';
-                return 'border-red-500/15';
-            },
-            bannerGlow() {
-                const s = this.data.status || '';
-                if (s.includes('Operational')) return 'box-shadow:0 0 50px rgba(16,185,129,.03)';
-                if (s.includes('Partial') || s.includes('Degraded')) return 'box-shadow:0 0 50px rgba(245,158,11,.03)';
-                return 'box-shadow:0 0 50px rgba(239,68,68,.03)';
-            },
-            bannerDot() {
-                const s = this.data.status || '';
-                if (s.includes('Operational')) return 'dot-up';
-                if (s.includes('Partial') || s.includes('Degraded')) return 'dot-warn';
-                return 'dot-down';
-            },
-
-            // Project helpers
-            projDot(p) {
-                const l = this.projLabel(p);
-                if (l === 'Operational') return 'dot-up';
-                if (l === 'Down') return 'dot-down';
-                return 'dot-warn';
-            },
-            projLabel(p) {
-                if (!p.components || !p.components.length) return 'No Data';
-                const down = p.components.filter(c => !c.is_up).length;
-                if (down === 0) return 'Operational';
-                if (down === p.components.length) return 'Down';
-                return 'Degraded';
-            },
-            projBadgeClass(p) {
-                const l = this.projLabel(p);
-                if (l === 'Operational') return 'badge-up';
-                if (l === 'Down') return 'badge-down';
-                return 'badge-part';
-            },
-
-            // Component helpers
-            uptimeColor(pct) {
-                if (pct >= 99) return 'text-emerald-400';
-                if (pct >= 90) return 'text-amber-400';
-                return 'text-red-400';
-            },
-            barClass(d) {
-                if (d.pct === undefined) return d.is_up ? 'bar-100' : 'bar-0';
-                if (d.pct >= 100) return 'bar-100';
-                if (d.pct >= 90) return 'bar-90';
-                if (d.pct >= 70) return 'bar-70';
-                if (d.pct >= 50) return 'bar-50';
-                if (d.pct > 0) return 'bar-0';
-                return 'bar-none';
-            },
-            fmtDate(s) {
-                try { return new Date(s+'T00:00:00').toLocaleDateString(undefined, {month:'short', day:'numeric'}); }
-                catch { return s; }
-            }
-        }));
+    themeBtn.addEventListener('click', () => {
+        const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('theme', next);
+        themeBtn.textContent = next === 'dark' ? '☀️' : '🌙';
     });
-    </script>
+
+    // ── Helpers ────────────────────────────────────────────
+    function fmtDuration(secs) {
+        if (!secs || secs <= 0) return '< 1 min';
+        const h = Math.floor(secs / 3600);
+        const m = Math.floor((secs % 3600) / 60);
+        if (h === 0 && m === 0) return '< 1 min';
+        let s = '';
+        if (h > 0) s += `${h}h `;
+        if (m > 0 || h === 0) s += `${m}m`;
+        return s.trim();
+    }
+
+    function fmtTime(isoStr) {
+        if (!isoStr) return '—';
+        try {
+            return new Date(isoStr).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        } catch (e) { return isoStr; }
+    }
+
+    function fmtDateTime(isoStr) {
+        if (!isoStr) return '—';
+        try {
+            const d = new Date(isoStr);
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        } catch (e) { return isoStr; }
+    }
+
+    function fmtDate(dateStr) {
+        try {
+            return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        } catch (e) { return dateStr; }
+    }
+
+    function timeAgo(isoStr) {
+        if (!isoStr) return 'just now';
+        try {
+            const diff = Math.floor((Date.now() - new Date(isoStr)) / 1000);
+            if (diff < 60) return 'just now';
+            if (diff < 3600) return `${Math.floor(diff/60)} min ago`;
+            if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+            return fmtDateTime(isoStr);
+        } catch (e) { return 'just now'; }
+    }
+
+    function escHtml(str) {
+        return String(str)
+            .replace(/&/g,'&amp;')
+            .replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;')
+            .replace(/"/g,'&quot;');
+    }
+
+    // ── Fetch ──────────────────────────────────────────────
+    async function fetchStatus() {
+        try {
+            const res = await fetch(API_URL + '?t=' + Date.now());
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            render(data);
+        } catch (err) {
+            renderError(err.message);
+        }
+    }
+
+    // ── Render ─────────────────────────────────────────────
+    function render(data) {
+        // Update header labels
+        const siteName = data.site_name || 'Darrov Status';
+        document.title = siteName + ' — ' + (data.status || 'Status');
+        document.getElementById('logo-name').textContent = siteName;
+        document.getElementById('footer-link').textContent = siteName + ' Monitor';
+        document.getElementById('last-updated-text').textContent = 'Updated ' + timeAgo(data.last_updated);
+        document.getElementById('footer-updated').textContent = 'Updated ' + timeAgo(data.last_updated);
+
+        // Status banner
+        let bannerClass = 'operational';
+        let bannerIcon = '✅';
+        let bannerTitle = "We're fully operational";
+        let bannerSub = "No incidents affecting our systems.";
+
+        const st = data.status || '';
+        if (st.includes('Partially') || st.includes('Degraded')) {
+            bannerClass = 'degraded';
+            bannerIcon = '⚠️';
+            bannerTitle = 'Partial System Outage';
+            bannerSub = 'Some services are experiencing issues right now.';
+        } else if (st.includes('Outage') || st.includes('Major')) {
+            bannerClass = 'outage';
+            bannerIcon = '🔴';
+            bannerTitle = 'Major System Outage';
+            bannerSub = 'We are experiencing widespread issues affecting our systems.';
+        }
+
+        // Date range (7 days)
+        let dateRangeStr = 'Last 7 days';
+        if (data.projects && data.projects.length > 0) {
+            const comps = data.projects[0].components;
+            if (comps && comps.length > 0 && comps[0].history && comps[0].history.length > 0) {
+                const hist = comps[0].history;
+                const d0 = fmtDate(hist[0].date);
+                const d1 = fmtDate(hist[hist.length - 1].date);
+                dateRangeStr = `${d0} – ${d1}`;
+            }
+        }
+
+        // Overall uptime
+        const upPct = typeof data.overall_uptime_pct === 'number' ? data.overall_uptime_pct.toFixed(3) : '—';
+        const totalSvc = data.total_services || 0;
+        const activeInc = data.active_incidents || 0;
+
+        let html = `
+<div class="status-banner ${bannerClass} fade-in">
+    <div class="banner-body">
+        <div class="banner-icon">${bannerIcon}</div>
+        <div>
+            <div class="banner-title">${escHtml(bannerTitle)}</div>
+            <div class="banner-sub">${escHtml(bannerSub)}</div>
+        </div>
+    </div>
+</div>
+
+<div class="stats-row fade-in">
+    <div class="stat-card">
+        <div class="stat-label">7-Day Uptime</div>
+        <div class="stat-value">${upPct}<span>%</span></div>
+        <div class="stat-sub">Overall across all services</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Active Services</div>
+        <div class="stat-value">${totalSvc}</div>
+        <div class="stat-sub">Monitored components</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Active Incidents</div>
+        <div class="stat-value" style="color: ${activeInc > 0 ? 'var(--down)' : 'var(--up)'}">
+            ${activeInc}
+        </div>
+        <div class="stat-sub">${activeInc === 0 ? 'All systems normal' : 'Services currently down'}</div>
+    </div>
+</div>
+
+<div class="status-card fade-in">
+    <div class="card-header">
+        <div class="card-title">System Status</div>
+        <div class="date-range">‹ ${escHtml(dateRangeStr)} ›</div>
+    </div>
+`;
+
+        if (!data.projects || data.projects.length === 0) {
+            html += `<div style="padding: 48px; text-align:center; color:var(--text-muted)">No services configured yet.</div>`;
+        } else {
+            data.projects.forEach(proj => {
+                html += `<div class="project-group">`;
+                if (data.projects.length > 1) {
+                    html += `<div class="project-label">${escHtml(proj.name)}</div>`;
+                }
+                (proj.components || []).forEach(comp => {
+                    html += renderComponent(comp);
+                });
+                html += `</div>`;
+            });
+        }
+
+        html += `</div>`; // .status-card
+
+        // Recent Outages
+        html += renderOutagesSection(data.recent_outages || []);
+
+        root.innerHTML = html;
+    }
+
+    function renderComponent(comp) {
+        const isUp = comp.is_up;
+        const pct = typeof comp.uptime_pct === 'number' ? comp.uptime_pct : 100;
+        const dotClass = isUp ? (pct < 100 ? 'warn' : 'up') : 'down';
+        const statusText = isUp ? (pct < 99 ? 'Degraded' : 'Operational') : 'Outage';
+        const badgeClass = isUp ? '' : 'down';
+
+        const downSecs = comp.total_downtime_secs || 0;
+        const outCount = comp.total_outages || 0;
+        const latency = comp.latency || 0;
+
+        // Bars
+        const history = comp.history || [];
+        let barsHtml = '';
+        history.forEach(day => {
+            const p = typeof day.pct === 'number' ? day.pct : (day.is_up ? 100 : 0);
+            let barClass = 'c-none';
+            if (p >= 100)      barClass = 'c-100';
+            else if (p >= 90)  barClass = 'c-good';
+            else if (p >= 50)  barClass = 'c-warn';
+            else if (p > 0)    barClass = 'c-bad';
+            else if (!day.is_up) barClass = 'c-bad';
+
+            // Tooltip
+            const dateFmt = fmtDate(day.date);
+            let tipContent = `<div class="tip-date">${escHtml(dateFmt)}</div>`;
+
+            if (!day.outages || day.outages.length === 0) {
+                tipContent += `<div class="tip-uptime">${p >= 100 ? '100.000' : p.toFixed(3)}% uptime</div>`;
+                tipContent += `<div class="tip-no-incidents">No incidents this day</div>`;
+            } else {
+                const totalDtSecs = day.outages.reduce((s, o) => s + o.duration_seconds, 0);
+                tipContent += `<div class="tip-uptime">${p.toFixed(3)}% uptime</div>`;
+                day.outages.forEach(o => {
+                    const dur = fmtDuration(o.duration_seconds);
+                    const tStart = fmtTime(o.start);
+                    const tEnd = fmtTime(o.end);
+                    tipContent += `
+<div class="tip-outage">
+    <div>
+        <div class="tip-outage-label">⚠ Outage &nbsp; ${escHtml(dur)}</div>
+        <div class="tip-outage-time">${escHtml(tStart)} – ${escHtml(tEnd)}</div>
+    </div>
+</div>`;
+                });
+            }
+
+            barsHtml += `<div class="bar ${barClass}"><div class="bar-tip">${tipContent}</div></div>`;
+        });
+
+        let metaStr = '';
+        if (outCount > 0) {
+            metaStr = `${outCount} outage${outCount > 1 ? 's' : ''}, ${fmtDuration(downSecs)} down`;
+        } else {
+            metaStr = 'No outages in 7 days';
+        }
+
+        return `
+<div class="comp-row">
+    <div class="comp-info">
+        <div class="comp-left">
+            <div class="status-dot ${dotClass}"></div>
+            <div class="comp-name">${escHtml(comp.name)}</div>
+            <div class="comp-status-badge ${badgeClass}">${escHtml(statusText)}</div>
+        </div>
+        <div class="comp-right">
+            ${latency > 0 ? `<div class="latency-badge">${latency}ms</div>` : ''}
+            <div class="comp-meta">
+                <strong>${pct.toFixed(3)}%</strong> uptime<br>
+                <span style="font-size:11px">${escHtml(metaStr)}</span>
+            </div>
+        </div>
+    </div>
+    <div class="bars-wrap">${barsHtml}</div>
+    <div class="bars-label">
+        <span>7 days ago</span>
+        <span>Today</span>
+    </div>
+</div>`;
+    }
+
+    function renderOutagesSection(outages) {
+        let html = `
+<div class="incidents-card fade-in">
+    <div class="card-header">
+        <div class="card-title">Recent Incidents</div>
+        <div class="date-range">Last 7 days</div>
+    </div>`;
+
+        if (!outages || outages.length === 0) {
+            html += `
+<div class="incidents-empty">
+    <div class="ei-icon">🎉</div>
+    <div>No incidents in the last 7 days</div>
+    <div style="margin-top:6px; font-size:12px; color:var(--text-faint)">All systems have been running smoothly</div>
+</div>`;
+        } else {
+            outages.forEach(o => {
+                const dur = fmtDuration(o.duration_seconds);
+                const startFmt = fmtDateTime(o.start);
+                const endFmt = o.is_ongoing ? 'Ongoing' : fmtDateTime(o.end);
+
+                html += `
+<div class="incident-row">
+    <div class="incident-icon">${o.is_ongoing ? '🔴' : '⚠️'}</div>
+    <div class="incident-body">
+        <div class="incident-service">
+            ${escHtml(o.service_name)}
+            ${o.is_ongoing ? '<span class="ongoing-badge">Ongoing</span>' : ''}
+        </div>
+        <div class="incident-time">${escHtml(startFmt)} → ${escHtml(endFmt)}</div>
+    </div>
+    <div class="incident-duration">${escHtml(dur)}</div>
+</div>`;
+            });
+        }
+
+        html += `</div>`;
+        return html;
+    }
+
+    function renderError(msg) {
+        root.innerHTML = `
+<div class="status-banner outage fade-in">
+    <div class="banner-body">
+        <div class="banner-icon">🔴</div>
+        <div>
+            <div class="banner-title">Connection Error</div>
+            <div class="banner-sub">Unable to fetch system status. Retrying in 30 seconds…</div>
+        </div>
+    </div>
+</div>`;
+        document.getElementById('last-updated-text').textContent = 'Connection error';
+    }
+
+    // ── Init ───────────────────────────────────────────────
+    fetchStatus();
+    setInterval(fetchStatus, 30000);
+
+    // Periodic "time ago" label refresh
+    setInterval(() => {
+        const el = document.getElementById('last-updated-text');
+        if (el && window._lastUpdatedISO) {
+            el.textContent = 'Updated ' + timeAgo(window._lastUpdatedISO);
+        }
+    }, 30000);
+
+    // ── WebSocket ──────────────────────────────────────────
+    function connectWS() {
+        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${proto}//${location.host}/ws`);
+        let debounceTimer = null;
+
+        ws.onopen = () => {
+            console.log('[WS] Connected');
+        };
+        ws.onclose = () => {
+            console.log('[WS] Disconnected, retrying in 5s…');
+            setTimeout(connectWS, 5000);
+        };
+        ws.onmessage = () => {
+            // Debounce — 2s interval'dan tez qayta fetch qilmaymiz
+            if (debounceTimer) return;
+            debounceTimer = setTimeout(() => {
+                debounceTimer = null;
+                fetchStatus();
+            }, 2000);
+        };
+    }
+    connectWS();
+</script>
 </body>
 </html>

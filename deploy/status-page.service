@@ -1,6 +1,8 @@
 [Unit]
 Description=Status Page Monitoring Service
-After=network.target
+Documentation=https://status.darrov.uz
+Wants=network-online.target
+After=network-online.target
 
 [Service]
 Type=simple
@@ -11,9 +13,16 @@ ExecStart=/opt/status-page/status-page
 Restart=always
 RestartSec=5
 EnvironmentFile=/opt/status-page/.env
+
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=status-page
+
+# Xavfsizlik
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+UMask=027
 
 [Install]
 WantedBy=multi-user.target
