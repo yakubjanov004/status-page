@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# generate-dropins.sh — Generate systemd drop-in files for webhook notifications.
+# generate-dropins.sh - Generate systemd drop-in files for webhook notifications.
 #
 # Usage:
 #   bash deploy/generate-dropins.sh            # dry-run (default)
 #   bash deploy/generate-dropins.sh --apply    # write files
 #
-# After --apply, run the printed install commands, then: systemctl daemon-reload
+# After --apply, copy files to /etc/systemd/system/ and run: systemctl daemon-reload
 
 set -uo pipefail
 
@@ -19,22 +19,21 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SYSTEMD_DIR="${SYSTEMD_DIR:-$REPO_ROOT/server's/system}"
 OUTPUT_DIR="${OUTPUT_DIR:-$REPO_ROOT/generated-dropins}"
 
-# Map unit name to canonical service name.
-# Returns empty string if unit should be skipped.
+# Map unit name to canonical service name via case statement.
+# Returns empty string for unknown/skipped units.
 service_for_unit() {
     case "$1" in
-        alfaconnect-bot.service)      echo "AlfaConnect" ;;
-        alfaconnect-webapp.service)   echo "AlfaConnect" ;;
-        mehmonxona.service)           echo "Mehmonxona" ;;
-        odimrepo-backend.service)     echo "Odimrepo" ;;
-        odimrepo-frontend.service)    echo "Odimrepo" ;;
-        tokpoint-backend.service)     echo "Tokpoint" ;;
-        tokpoint-frontend.service)    echo "Tokpoint" ;;
-        tokpoint-worker.service)      echo "Tokpoint" ;;
-        tokpoint-beat.service)        echo "Tokpoint" ;;
-        *)                            echo "" ;;
+        alfaconnect-bot.service)    echo "AlfaConnect" ;;
+        alfaconnect-webapp.service) echo "AlfaConnect" ;;
+        mehmonxona.service)         echo "Mehmonxona"  ;;
+        odimrepo-backend.service)   echo "Odimrepo"    ;;
+        odimrepo-frontend.service)  echo "Odimrepo"    ;;
+        tokpoint-backend.service)   echo "Tokpoint"    ;;
+        tokpoint-frontend.service)  echo "Tokpoint"    ;;
+        tokpoint-worker.service)    echo "Tokpoint"    ;;
+        tokpoint-beat.service)      echo "Tokpoint"    ;;
+        *)                          echo ""            ;;
     esac
-    # Note: tokpoint-docker.service is excluded — handled by dockerwatch.
 }
 
 UNITS="alfaconnect-bot.service
@@ -75,46 +74,41 @@ for unit in $UNITS; do
     fi
 
     if [ ! -f "$SYSTEMD_DIR/$unit" ]; then
-        printf '  o SKIP   %s  (not in %s)\n' "$unit" "$SYSTEMD_DIR"
+        printf '  o SKIP  %s (not in scan dir)\n' "$unit"
         SKIPPED=$((SKIPPED + 1))
         continue
     fi
 
-    printf '  + FOUND  %s  ->  %s\n' "$unit" "$canonical"
+    printf '  + FOUND %s  ->  %s\n' "$unit" "$canonical"
     FOUND=$((FOUND + 1))
 
     if ! $DRY_RUN; then
         dropin_dir="$OUTPUT_DIR/${unit}.d"
         mkdir -p "$dropin_dir"
-        cat > "$dropin_dir/notify.conf" <<DROPIN
-[Service]
-ExecStartPost=/usr/local/bin/service-notify.sh up %n
-ExecStopPost=/usr/local/bin/service-notify.sh down %n
-OnFailure=notify@%n.service
-DROPIN
+        printf '[Service]\n' > "$dropin_dir/notify.conf"
+        printf 'ExecStartPost=/usr/local/bin/service-notify.sh up %%n\n' >> "$dropin_dir/notify.conf"
+        printf 'ExecStopPost=/usr/local/bin/service-notify.sh down %%n\n' >> "$dropin_dir/notify.conf"
+        printf 'OnFailure=notify@%%n.service\n' >> "$dropin_dir/notify.conf"
         printf '      Written: %s/notify.conf\n' "$dropin_dir"
     fi
 done
 
 printf '\n------------------------------------------------------\n'
-printf '  Found: %d  |  Skipped: %d\n' "$FOUND" "$SKIPPED"
+printf '  Found: %d  Skipped: %d\n' "$FOUND" "$SKIPPED"
 printf '------------------------------------------------------\n\n'
 
 if [ "$FOUND" -eq 0 ]; then
-    printf 'No matching units found. Check SYSTEMD_DIR.\n'
+    printf 'No matching units found.\n'
     exit 0
 fi
 
-printf '  Prerequisite — run once if not already done:\n\n'
+printf '  Prerequisites (run once if not done):\n\n'
 printf '    cp %s/service-notify.sh /usr/local/bin/service-notify.sh\n' "$SCRIPT_DIR"
 printf '    chmod +x /usr/local/bin/service-notify.sh\n'
 printf '    cp %s/notify@.service /etc/systemd/system/notify@.service\n\n' "$SCRIPT_DIR"
-printf '  /etc/default/service-notify contents:\n\n'
-printf '    WEBHOOK_URL=http://127.0.0.1:8080/api/v1/webhook\n'
-printf '    HOOK_TOKEN=<your-token>\n\n'
 
 if $DRY_RUN; then
-    printf '  Run with --apply to generate files, then install:\n\n'
+    printf '  Run --apply then install with:\n\n'
     printf '    bash %s/generate-dropins.sh --apply\n\n' "$SCRIPT_DIR"
 else
     printf '  Install commands:\n\n'
@@ -125,7 +119,7 @@ for unit in $UNITS; do
     [ -z "$canonical" ] && continue
     [ ! -f "$SYSTEMD_DIR/$unit" ] && continue
     printf '    mkdir -p /etc/systemd/system/%s.d\n' "$unit"
-    printf '    cp %s/%s.d/notify.conf /etc/systemd/system/%s.d/notify.conf\n' \
+    printf '    cp %s/%s.d/notify.conf /etc/systemd/system/%s.d/\n' \
         "$OUTPUT_DIR" "$unit" "$unit"
 done
 
