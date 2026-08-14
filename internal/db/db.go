@@ -47,6 +47,7 @@ func runMigrations() error {
 		"001_init.sql",
 		"002_add_projects.sql",
 		"003_add_maintenance_log.sql",
+		"004_add_service_name_to_maintenance_log.sql",
 	}
 
 	for _, file := range migrationFiles {

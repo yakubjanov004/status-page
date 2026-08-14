@@ -1023,8 +1023,6 @@ ${attentionHtml}
     }
 
     function renderMaintenanceLogsSection(logs) {
-        if (!logs || logs.length === 0) return '';
-        
         let html = `
 <div class="incidents-card fade-in">
     <div class="card-header">
@@ -1032,24 +1030,42 @@ ${attentionHtml}
         <div class="date-range">Oxirgi hodisalar</div>
     </div>`;
 
-        logs.forEach(log => {
-            const dur = log.duration_seconds != null ? fmtDuration(log.duration_seconds) : '';
-            const startFmt = fmtDateTime(log.started_at);
-            const timeAgoStr = timeAgo(log.started_at);
-
+        if (!logs || logs.length === 0) {
             html += `
+<div class="incidents-empty" style="padding: 24px;">
+    <div>Hozircha tizim yangilanishlari kuzatilmadi</div>
+</div>`;
+        } else {
+            logs.forEach(log => {
+                const dur = log.duration_seconds != null ? fmtDuration(log.duration_seconds) : '';
+                const startFmt = fmtDateTime(log.started_at);
+                const timeAgoStr = timeAgo(log.started_at);
+                
+                let icon = '🔄';
+                if (log.event_type === 'start') icon = '▶️';
+                else if (log.event_type === 'stop') icon = '⏹️';
+
+                let title = log.service_name || 'Tizim';
+                if (title.endsWith('.service')) title = title.replace('.service', '');
+                
+                let badgeClass = 'up';
+                if (log.event_type === 'stop') badgeClass = 'down';
+
+                html += `
 <div class="incident-row">
-    <div class="incident-icon">🔄</div>
+    <div class="incident-icon">${icon}</div>
     <div class="incident-body">
         <div class="incident-service">
-            ${escHtml(log.description || 'Tizim qayta ishga tushirildi')}
-            <span class="proj-badge up" style="font-size: 9px; padding: 1px 5px;">${escHtml(timeAgoStr)}</span>
+            ${escHtml(title)}
+            <span class="proj-badge ${badgeClass}" style="font-size: 9px; padding: 1px 5px;">${escHtml(log.event_type || 'restart')}</span>
+            <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px; font-weight: normal;">${escHtml(timeAgoStr)}</span>
         </div>
-        <div class="incident-time">${escHtml(startFmt)}</div>
+        <div class="incident-time">${escHtml(startFmt)} - ${escHtml(log.description || 'Qayta ishga tushirildi')}</div>
     </div>
     <div class="incident-duration">${escHtml(dur)}</div>
 </div>`;
-        });
+            });
+        }
 
         html += `</div>`;
         return html;

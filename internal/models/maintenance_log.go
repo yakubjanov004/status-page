@@ -6,6 +6,7 @@ type MaintenanceLog struct {
 	ID              int        `json:"id"`
 	EventType       string     `json:"event_type"`
 	Description     string     `json:"description"`
+	ServiceName     string     `json:"service_name"`
 	StartedAt       time.Time  `json:"started_at"`
 	EndedAt         *time.Time `json:"ended_at,omitempty"`
 	DurationSeconds *int       `json:"duration_seconds,omitempty"`

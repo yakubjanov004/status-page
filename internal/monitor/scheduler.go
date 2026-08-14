@@ -34,7 +34,7 @@ func InitScheduler() *Scheduler {
 
 func (s *Scheduler) StartAll() {
 	// Log the restart event
-	logID, err := db.LogMaintenanceEvent("restart", "Status Page Service Restart")
+	logID, err := db.LogMaintenanceEvent("restart", "Status Page Service Restart", "status-page")
 	if err != nil {
 		log.Println("[SCHEDULER] Error logging maintenance event:", err)
 	} else {

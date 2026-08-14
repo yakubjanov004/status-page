@@ -114,8 +114,8 @@ func GetRecentHeartbeats(monitorID int, limit int) ([]models.Heartbeat, error) {
 	return hbs, nil
 }
 
-func LogMaintenanceEvent(eventType, description string) (int, error) {
-	res, err := DB.Exec(`INSERT INTO maintenance_log (event_type, description) VALUES (?, ?)`, eventType, description)
+func LogMaintenanceEvent(eventType, description, serviceName string) (int, error) {
+	res, err := DB.Exec(`INSERT INTO maintenance_log (event_type, description, service_name) VALUES (?, ?, ?)`, eventType, description, serviceName)
 	if err != nil {
 		return 0, err
 	}
@@ -133,7 +133,7 @@ func CompleteMaintenanceEvent(id int) error {
 }
 
 func GetRecentMaintenanceLogs(limit int) ([]models.MaintenanceLog, error) {
-	rows, err := DB.Query(`SELECT id, event_type, description, started_at, ended_at, duration_seconds FROM maintenance_log ORDER BY started_at DESC LIMIT ?`, limit)
+	rows, err := DB.Query(`SELECT id, event_type, description, service_name, started_at, ended_at, duration_seconds FROM maintenance_log ORDER BY started_at DESC LIMIT ?`, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +144,7 @@ func GetRecentMaintenanceLogs(limit int) ([]models.MaintenanceLog, error) {
 		var log models.MaintenanceLog
 		var endedAt sql.NullTime
 		var durationSecs sql.NullInt64
-		if err := rows.Scan(&log.ID, &log.EventType, &log.Description, &log.StartedAt, &endedAt, &durationSecs); err != nil {
+		if err := rows.Scan(&log.ID, &log.EventType, &log.Description, &log.ServiceName, &log.StartedAt, &endedAt, &durationSecs); err != nil {
 			return nil, err
 		}
 		if endedAt.Valid {

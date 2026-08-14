@@ -30,6 +30,9 @@ func main() {
 	}
 	scheduler.StartAll()
 
+	// Systemd jurnalini kuzatish (xizmatlar restart/stop bo'lishi)
+	monitor.StartJournalWatcher()
+
 	// Eski heartbeatlarni tozalash
 	db.StartCleanupJob()
 
