@@ -32,7 +32,7 @@ func Load() *Config {
 
 	siteName := os.Getenv("SITE_NAME")
 	if siteName == "" {
-		siteName = "Darrov Status"
+		siteName = "Server Status"
 	}
 
 	siteURL := os.Getenv("SITE_URL")

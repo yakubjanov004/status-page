@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"status-page/internal/config"
 	"status-page/internal/db"
+	"status-page/internal/models"
 	"strings"
 	"time"
 )
@@ -23,6 +24,7 @@ type PublicStatusResponse struct {
 type PublicProjectData struct {
 	ID         int             `json:"id"`
 	Name       string          `json:"name"`
+	Slug       string          `json:"slug"`
 	Components []ComponentData `json:"components"`
 }
 
@@ -49,6 +51,7 @@ type ComponentData struct {
 	TotalDowntimeSecs int           `json:"total_downtime_secs"`
 	TotalOutages      int           `json:"total_outages"`
 	LongestOutageSecs int           `json:"longest_outage_secs"`
+	CreatedAt         string        `json:"created_at"`
 	History           []DailyStatus `json:"history"`
 }
 
@@ -56,6 +59,7 @@ type DailyStatus struct {
 	Date    string   `json:"date"`
 	IsUp    bool     `json:"is_up"`
 	Pct     float64  `json:"pct"`
+	HasData bool     `json:"has_data"`
 	Outages []Outage `json:"outages"`
 }
 
@@ -67,7 +71,7 @@ func GetPublicStatusHandler(cfg *config.Config) http.HandlerFunc {
 
 		siteName := cfg.SiteName
 		if siteName == "" {
-			siteName = "Darrov Status"
+			siteName = "Server Status"
 		}
 
 		// 1. Loyihalar
@@ -90,8 +94,7 @@ func GetPublicStatusHandler(cfg *config.Config) http.HandlerFunc {
 
 		for rows.Next() {
 			var p projInfo
-			var slug string
-			if err := rows.Scan(&p.data.ID, &p.data.Name, &slug); err != nil {
+			if err := rows.Scan(&p.data.ID, &p.data.Name, &p.data.Slug); err != nil {
 				continue
 			}
 			p.data.Components = []ComponentData{}
@@ -152,7 +155,7 @@ func GetPublicStatusHandler(cfg *config.Config) http.HandlerFunc {
 			}
 
 			// 7 kunlik history
-			history, totalSeconds, downtimeSeconds, rawOutages := buildHistory(m.ID, m.IntervalSeconds)
+			history, totalSeconds, downtimeSeconds, rawOutages := buildHistory(m, 7)
 
 			uptimePct := 100.0
 			if totalSeconds > 0 {
@@ -203,6 +206,7 @@ func GetPublicStatusHandler(cfg *config.Config) http.HandlerFunc {
 				TotalDowntimeSecs: totalDowntime,
 				TotalOutages:      len(rawOutages),
 				LongestOutageSecs: longestOutage,
+				CreatedAt:         m.CreatedAt.Format(time.RFC3339),
 				History:           history,
 			})
 		}
@@ -269,26 +273,26 @@ func sortRecentOutages(outages []RecentOutage) {
 	}
 }
 
-func buildHistory(monitorID int, intervalSeconds int) ([]DailyStatus, int, int, []flatOutage) {
+func buildHistory(m models.Monitor, days int) ([]DailyStatus, int, int, []flatOutage) {
 	var history []DailyStatus
 	now := time.Now().UTC()
 
 	daysMap := make(map[string]*DailyStatus)
-	for i := 6; i >= 0; i-- {
+	for i := days - 1; i >= 0; i-- {
 		dateStr := now.AddDate(0, 0, -i).Format("2006-01-02")
-		d := DailyStatus{Date: dateStr, IsUp: true, Pct: 100.0, Outages: []Outage{}}
+		d := DailyStatus{Date: dateStr, IsUp: true, Pct: 100.0, HasData: true, Outages: []Outage{}}
 		history = append(history, d)
-		daysMap[dateStr] = &history[6-i]
+		daysMap[dateStr] = &history[len(history)-1]
 	}
 
-	startDateStr := now.AddDate(0, 0, -6).Format("2006-01-02")
+	startDateStr := now.AddDate(0, 0, -(days - 1)).Format("2006-01-02")
 
 	rows, err := db.DB.Query(`
 		SELECT is_up, checked_at 
 		FROM heartbeats 
 		WHERE monitor_id = ? AND checked_at >= ?
 		ORDER BY checked_at ASC
-	`, monitorID, startDateStr+" 00:00:00")
+	`, m.ID, startDateStr+" 00:00:00")
 
 	var hbs []struct {
 		IsUp      bool
@@ -330,13 +334,13 @@ func buildHistory(monitorID int, intervalSeconds int) ([]DailyStatus, int, int, 
 	var lastCheckedAt time.Time
 
 	// 2.5x grace period — monitor restart bo'lsa false positive bo'lmasin
-	gracePeriod := time.Duration(float64(intervalSeconds)*2.5) * time.Second
+	gracePeriod := time.Duration(float64(m.IntervalSeconds)*2.5) * time.Second
 
 	for _, hb := range hbs {
 		if !lastCheckedAt.IsZero() {
 			gap := hb.CheckedAt.Sub(lastCheckedAt)
 			if gap > gracePeriod {
-				outageStart := lastCheckedAt.Add(time.Duration(intervalSeconds) * time.Second)
+				outageStart := lastCheckedAt.Add(time.Duration(m.IntervalSeconds) * time.Second)
 				if currentOutageStart == nil {
 					t := outageStart
 					currentOutageStart = &t
@@ -414,6 +418,15 @@ func buildHistory(monitorID int, intervalSeconds int) ([]DailyStatus, int, int, 
 
 	for i := range history {
 		day := &history[i]
+
+		// If the end of this day is before monitor was created, it has no data
+		dayEndTime, _ := time.Parse("2006-01-02", day.Date)
+		dayEndTime = dayEndTime.Add(24 * time.Hour).Add(-1 * time.Nanosecond)
+		if dayEndTime.Before(m.CreatedAt) {
+			day.HasData = false
+			day.Pct = 0
+			continue
+		}
 
 		totalDowntime := 0
 		for _, o := range day.Outages {

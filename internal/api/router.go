@@ -23,6 +23,7 @@ func NewRouter(cfg *config.Config) *chi.Mux {
 
 	// Public API — cfg closure orqali handler'ga uzatiladi
 	r.Get("/api/public/status", GetPublicStatusHandler(cfg))
+	r.Get("/api/public/status/project/{slug}", GetProjectStatusHandler(cfg))
 
 	// WebSocket
 	r.Get("/ws", websocket.GlobalHub.HandleWebSocket)
