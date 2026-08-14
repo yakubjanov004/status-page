@@ -21,19 +21,5 @@ export function findPrimaryProblem(projects) {
         }
     }
 
-    for (const proj of projects) {
-        for (const comp of proj.components || []) {
-            const pct = typeof comp.uptime_pct === 'number' ? comp.uptime_pct : 100;
-            if (comp.is_up && pct < 99) {
-                return {
-                    severity: 'warn',
-                    projectName: proj.name,
-                    projectSlug: proj.slug,
-                    componentName: comp.name,
-                };
-            }
-        }
-    }
-
     return null;
 }

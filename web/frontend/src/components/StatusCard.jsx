@@ -27,8 +27,8 @@ export default function StatusCard({
     // Filter components
     let visibleCount = 0;
     const projectGroups = (projects || []).map((proj) => {
-        let isProjUp = true;
-        let isProjDown = false;
+        let upCount = 0;
+        let downCount = 0;
 
         const filteredComps = (proj.components || []).filter((comp) => {
             const q = filterQuery.toLowerCase();
@@ -36,15 +36,20 @@ export default function StatusCard({
                 comp.name.toLowerCase().includes(q) ||
                 proj.name.toLowerCase().includes(q);
 
-            const pct = typeof comp.uptime_pct === 'number' ? comp.uptime_pct : 100;
-            const hasIssue = !comp.is_up || pct < 99;
+            const hasIssue = !comp.is_up;
             const matchFilter = !showOnlyIssues || hasIssue;
-
-            if (!comp.is_up) isProjDown = true;
-            if (hasIssue) isProjUp = false;
 
             return matchSearch && matchFilter;
         });
+        
+        (proj.components || []).forEach(comp => {
+            if (comp.is_up) upCount++;
+            else downCount++;
+        });
+        
+        let isProjDown = downCount > 0 && upCount === 0; // All down
+        let isProjUp = downCount === 0; // All up
+        // If downCount > 0 && upCount > 0, both are false, which triggers 'warn' (Qisman uzilish) in rendering
 
         visibleCount += filteredComps.length;
 

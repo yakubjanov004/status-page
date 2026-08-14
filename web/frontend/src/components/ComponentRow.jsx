@@ -5,9 +5,9 @@ import './ComponentRow.css';
 export default function ComponentRow({ comp, isPrimaryProblem }) {
     const isUp = comp.is_up;
     const pct = typeof comp.uptime_pct === 'number' ? comp.uptime_pct : 100;
-    const dotClass = isUp ? (pct < 100 ? 'warn' : 'up') : 'down';
-    const rowClass = isUp ? (pct < 99 ? 'row-warn' : 'row-up') : 'row-down';
-    const statusText = isUp ? (pct < 99 ? 'Qisman uzilish' : 'Ishlamoqda') : 'Uzilish';
+    const dotClass = isUp ? 'up' : 'down';
+    const rowClass = isUp ? 'row-up' : 'row-down';
+    const statusText = isUp ? 'Ishlamoqda' : 'Uzilish';
     const badgeClass = isUp ? '' : 'down';
 
     const downSecs = comp.total_downtime_secs || 0;
