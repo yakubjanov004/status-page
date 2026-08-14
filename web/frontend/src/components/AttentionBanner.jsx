@@ -7,7 +7,7 @@ export default function AttentionBanner({ projects, onOpenProject }) {
         projects.forEach((p) => {
             (p.components || []).forEach((c) => {
                 const pct = typeof c.uptime_pct === 'number' ? c.uptime_pct : 100;
-                if (!c.is_up || pct < 99) {
+                if (!c.is_up) {
                     issues.push({ name: c.name, slug: p.slug });
                 }
             });

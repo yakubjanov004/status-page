@@ -1,15 +1,39 @@
 .comp-row {
     padding: 18px 24px;
     border-bottom: 1px solid var(--border-soft);
-    transition: background var(--transition);
+    transition: background var(--transition), border-color var(--transition);
+    border-left: 3px solid transparent;
+}
+
+.comp-row.row-up {
+    border-left-color: var(--up);
+    background: var(--up-bg);
+}
+
+.comp-row.row-down {
+    border-left-color: var(--down);
+    background: var(--down-bg);
+}
+
+.comp-row.row-warn {
+    border-left-color: var(--warn);
+    background: var(--warn-bg);
 }
 
 .comp-row:last-child {
     border-bottom: none;
 }
 
-.comp-row:hover {
-    background: var(--surface-2);
+.comp-row.row-up:hover {
+    background: color-mix(in srgb, var(--up-bg) 70%, var(--surface-2) 30%);
+}
+
+.comp-row.row-down:hover {
+    background: color-mix(in srgb, var(--down-bg) 70%, var(--surface-2) 30%);
+}
+
+.comp-row.row-warn:hover {
+    background: color-mix(in srgb, var(--warn-bg) 70%, var(--surface-2) 30%);
 }
 
 .comp-info {

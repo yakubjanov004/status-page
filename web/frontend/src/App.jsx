@@ -6,8 +6,7 @@ import StatusBanner from './components/StatusBanner';
 import StatsRow from './components/StatsRow';
 import AttentionBanner from './components/AttentionBanner';
 import StatusCard from './components/StatusCard';
-import OutagesSection from './components/OutagesSection';
-import MaintenanceLogs from './components/MaintenanceLogs';
+import EventsTabs from './components/EventsTabs';
 import ProjectModal from './components/ProjectModal';
 import Legend from './components/Legend';
 import Skeleton from './components/Skeleton';
@@ -92,9 +91,10 @@ export default function App() {
                                     onOpenProject={handleOpenProject}
                                 />
 
-                                <MaintenanceLogs logs={data.maintenance_logs} />
-
-                                <OutagesSection outages={data.recent_outages} />
+                                <EventsTabs
+                                    outages={data.recent_outages}
+                                    maintenanceLogs={data.maintenance_logs}
+                                />
 
                                 <Legend />
                             </>
