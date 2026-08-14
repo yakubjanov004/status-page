@@ -1,22 +1,16 @@
-.status-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-    overflow: hidden;
+/* ── Status Section ─────────────────────────────── */
+.status-section {
     margin-bottom: 20px;
 }
 
-.card-header {
-    padding: 18px 24px;
-    border-bottom: 1px solid var(--border-soft);
+.section-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: var(--surface);
+    margin-bottom: 16px;
 }
 
-.card-title {
+.section-title {
     font-size: 15px;
     font-weight: 700;
     letter-spacing: -0.2px;
@@ -30,55 +24,91 @@
     gap: 4px;
 }
 
-/* Project group */
-.project-group {
-    border-bottom: 1px solid var(--border-soft);
+/* ── Projects Grid ─────────────────────────────── */
+.projects-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
 }
 
-.project-group:last-child {
-    border-bottom: none;
+/* ── Project Card ──────────────────────────────── */
+.project-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    transition: box-shadow 0.25s ease, border-color 0.25s ease;
 }
 
-.project-label {
-    padding: 10px 24px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    color: var(--text-faint);
-    background: var(--surface-2);
-    border-bottom: 1px solid var(--border-soft);
-    cursor: pointer;
-    transition: background var(--transition);
+.project-card:hover {
+    box-shadow: var(--shadow-md);
+}
+
+.project-card.card-up {
+    border-left: 4px solid var(--up);
+}
+
+.project-card.card-down {
+    border-left: 4px solid var(--down);
+}
+
+.project-card.card-warn {
+    border-left: 4px solid var(--warn);
+}
+
+.project-card-header {
+    padding: 14px 20px;
     display: flex;
     align-items: center;
     justify-content: space-between;
+    cursor: pointer;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border-soft);
+    transition: background var(--transition);
 }
 
-.project-label:hover {
-    background: var(--border-soft);
+.project-card-header:hover {
+    background: var(--surface-2);
 }
 
-.project-label-left {
+.project-card-left {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
 }
 
-.project-label-hint {
-    font-size: 9px;
-    font-weight: normal;
-    text-transform: none;
-    letter-spacing: 0;
+.project-card-icon {
+    font-size: 14px;
+}
+
+.project-card-name {
+    font-size: 14px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text);
+}
+
+.project-card-hint {
+    font-size: 11px;
     color: var(--text-faint);
+    transition: color var(--transition);
 }
 
+.project-card-header:hover .project-card-hint {
+    color: var(--text-muted);
+}
+
+
+/* ── Project Badge ─────────────────────────────── */
 .proj-badge {
     font-size: 10px;
     font-weight: 700;
-    padding: 2px 6px;
-    border-radius: 4px;
+    padding: 2px 8px;
+    border-radius: 20px;
     text-transform: uppercase;
+    letter-spacing: 0.3px;
 }
 
 .proj-badge.up {
@@ -99,8 +129,12 @@
     border: 1px solid var(--down-border);
 }
 
+/* ── No Results ────────────────────────────────── */
 .no-results {
     padding: 48px;
     text-align: center;
     color: var(--text-muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
 }

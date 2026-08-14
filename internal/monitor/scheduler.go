@@ -105,6 +105,24 @@ func (s *Scheduler) StopMonitor(id int) {
 	}
 }
 
+// ForceStatus — service-notify yoki tashqi manbadan kelgan statusni
+// darhol scheduler'ning ichki holatiga yozadi.
+// Bu retry kechikishini chetlab o'tadi.
+func (s *Scheduler) ForceStatus(monitorID int, isUp bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if isUp {
+		s.retries[monitorID] = 0
+	} else {
+		// DOWN kelganda retry counter'ni max qilamiz —
+		// keyingi scheduler check darhol DOWN yozadi
+		s.retries[monitorID] = maxRetries
+	}
+	s.lastStatus[monitorID] = isUp
+}
+
+
 func (s *Scheduler) runCheck(m *models.Monitor) {
 	hb := Check(m)
 

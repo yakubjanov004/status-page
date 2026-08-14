@@ -112,19 +112,20 @@ func watchDocker() {
 		}
 
 		// Docker action: "start", "stop", "restart", "die"
-		if event.Action == "start" {
+		switch event.Action {
+		case "start":
 			logID, err := db.LogMaintenanceEvent("start", "Docker: "+containerName+" ishga tushirildi", containerName)
 			if err == nil {
 				db.CompleteMaintenanceEvent(logID)
 				notifyFrontend()
 			}
-		} else if event.Action == "stop" || event.Action == "die" {
+		case "stop", "die":
 			logID, err := db.LogMaintenanceEvent("stop", "Docker: "+containerName+" to'xtatildi", containerName)
 			if err == nil {
 				db.CompleteMaintenanceEvent(logID)
 				notifyFrontend()
 			}
-		} else if event.Action == "restart" {
+		case "restart":
 			logID, err := db.LogMaintenanceEvent("restart", "Docker: "+containerName+" qayta ishga tushirildi", containerName)
 			if err == nil {
 				db.CompleteMaintenanceEvent(logID)

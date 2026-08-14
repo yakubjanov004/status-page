@@ -7,6 +7,7 @@ import (
 	"os"
 	"status-page/internal/db"
 	"status-page/internal/models"
+	"status-page/internal/monitor"
 	"status-page/internal/notify"
 	"status-page/internal/websocket"
 	"strings"
@@ -84,7 +85,13 @@ func HandleServiceNotify(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			log.Printf("[SERVICE-NOTIFY] Heartbeat saved: %s -> %s", m.Name, req.Action)
+			// Scheduler'ning ichki holatini sinxronlaymiz —
+			// retry kechikishini chetlab o'tadi
+			if monitor.GlobalScheduler != nil {
+				monitor.GlobalScheduler.ForceStatus(m.ID, isUp)
+			}
+
+			log.Printf("[SERVICE-NOTIFY] Heartbeat saved: %s -> %s (scheduler synced)", m.Name, req.Action)
 
 			// Telegram notification — status o'zgarganda
 			telegramToken := os.Getenv("TELEGRAM_BOT_TOKEN")

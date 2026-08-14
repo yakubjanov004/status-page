@@ -9,13 +9,26 @@ export default function UptimeBars({ history }) {
             <div className="bars-wrap">
                 {history.map((day, i) => {
                     const p = typeof day.pct === 'number' ? day.pct : (day.is_up ? 100 : 0);
+                    const isLastDay = i === history.length - 1;
+                    const hasOutages = day.outages && day.outages.length > 0;
                     let barClass = 'c-none';
-                    if (day.has_data === false) barClass = 'c-nodata';
-                    else if (p >= 100)  barClass = 'c-100';
-                    else if (p >= 90)   barClass = 'c-good';
-                    else if (p >= 50)   barClass = 'c-warn';
-                    else if (p > 0)     barClass = 'c-bad';
-                    else if (!day.is_up) barClass = 'c-bad';
+
+                    if (day.has_data === false) {
+                        barClass = 'c-nodata';
+                    } else if (!day.is_up && isLastDay) {
+                        // Hozir down bo'lsa — qizil
+                        barClass = 'c-bad';
+                    } else if (p >= 100 && !hasOutages) {
+                        barClass = 'c-100';
+                    } else if (p >= 99 && !hasOutages) {
+                        barClass = 'c-100';
+                    } else if (p >= 95) {
+                        barClass = hasOutages ? 'c-warn' : 'c-good';
+                    } else if (p >= 50) {
+                        barClass = 'c-warn';
+                    } else {
+                        barClass = 'c-bad';
+                    }
 
                     return (
                         <div className={`bar ${barClass}`} key={i}>

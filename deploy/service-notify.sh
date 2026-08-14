@@ -15,13 +15,23 @@
 ACTION="${1:-up}"
 SERVICE="${2:-unknown.service}"
 STATUS_API="http://127.0.0.1:8880/api/internal/service-notify"
+LOG_TAG="service-notify"
 
-# JSON payload yuborish
-curl -s -X POST "$STATUS_API" \
+# JSON payload yuborish — xatolarni log qilamiz
+RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$STATUS_API" \
   -H "Content-Type: application/json" \
   -d "{\"action\":\"$ACTION\",\"service\":\"$SERVICE\"}" \
   --connect-timeout 3 \
-  --max-time 5 \
-  > /dev/null 2>&1 || true
+  --max-time 5 2>&1)
 
-# Xatolik bo'lsa ham xizmat ishga tushishiga halaqit bermaymiz (|| true)
+HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+BODY=$(echo "$RESPONSE" | sed '$d')
+
+if [ "$HTTP_CODE" = "200" ]; then
+  logger -t "$LOG_TAG" "OK: $SERVICE -> $ACTION (HTTP $HTTP_CODE)"
+else
+  logger -t "$LOG_TAG" "ERROR: $SERVICE -> $ACTION (HTTP $HTTP_CODE) body: $BODY"
+fi
+
+# Xatolik bo'lsa ham xizmat ishga tushishiga halaqit bermaymiz
+exit 0

@@ -4,7 +4,7 @@ import { useWebSocket } from './hooks/useWebSocket';
 import Header from './components/Header';
 import StatusBanner from './components/StatusBanner';
 import StatsRow from './components/StatsRow';
-import AttentionBanner from './components/AttentionBanner';
+
 import StatusCard from './components/StatusCard';
 import EventsTabs from './components/EventsTabs';
 import ProjectModal from './components/ProjectModal';
@@ -69,10 +69,7 @@ export default function App() {
                             </div>
                         ) : data ? (
                             <>
-                                <AttentionBanner
-                                    projects={data.projects}
-                                    onOpenProject={handleOpenProject}
-                                />
+
 
                                 <StatusBanner status={data.status} />
 

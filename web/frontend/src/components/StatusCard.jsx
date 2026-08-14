@@ -56,15 +56,15 @@ export default function StatusCard({
     });
 
     return (
-        <div className="status-card fade-in">
+        <div className="status-section fade-in">
             <FilterBar
                 filterQuery={filterQuery}
                 onFilterChange={onFilterChange}
                 showOnlyIssues={showOnlyIssues}
                 onToggleIssues={onToggleIssues}
             />
-            <div className="card-header">
-                <div className="card-title">Tizim holati</div>
+            <div className="section-header">
+                <div className="section-title">Tizim holati</div>
                 <div className="date-range">‹ {dateRangeStr} ›</div>
             </div>
 
@@ -73,43 +73,49 @@ export default function StatusCard({
             ) : visibleCount === 0 ? (
                 <div className="no-results">Qidiruvingizga mos komponent topilmadi.</div>
             ) : (
-                projectGroups.map((proj) => {
-                    if (proj.filteredComps.length === 0) return null;
+                <div className="projects-grid">
+                    {projectGroups.map((proj) => {
+                        if (proj.filteredComps.length === 0) return null;
 
-                    let badgeClass = 'up';
-                    let badgeText = 'Ishlamoqda';
-                    if (proj.isProjDown) {
-                        badgeClass = 'down';
-                        badgeText = 'Uzilish';
-                    } else if (!proj.isProjUp) {
-                        badgeClass = 'warn';
-                        badgeText = 'Qisman uzilish';
-                    }
+                        let badgeClass = 'up';
+                        let badgeText = 'Ishlamoqda';
+                        let statusIcon = '✅';
+                        if (proj.isProjDown) {
+                            badgeClass = 'down';
+                            badgeText = 'Uzilish';
+                            statusIcon = '🔴';
+                        } else if (!proj.isProjUp) {
+                            badgeClass = 'warn';
+                            badgeText = 'Qisman uzilish';
+                            statusIcon = '🟡';
+                        }
 
-                    return (
-                        <div className="project-group" key={proj.id || proj.slug}>
-                            {projects.length > 1 && (
+                        return (
+                            <div className={`project-card card-${badgeClass}`} key={proj.id || proj.slug}>
                                 <div
-                                    className="project-label"
+                                    className="project-card-header"
                                     onClick={() => onOpenProject(proj.slug)}
                                 >
-                                    <div className="project-label-left">
-                                        {proj.name}
+                                    <div className="project-card-left">
+                                        <span className="project-card-icon">{statusIcon}</span>
+                                        <span className="project-card-name">{proj.name}</span>
                                         <span className={`proj-badge ${badgeClass}`}>
                                             {badgeText}
                                         </span>
                                     </div>
-                                    <span className="project-label-hint">
+                                    <span className="project-card-hint">
                                         Batafsil ko'rish uchun bosing
                                     </span>
                                 </div>
-                            )}
-                            {proj.filteredComps.map((comp, i) => (
-                                <ComponentRow key={i} comp={comp} />
-                            ))}
-                        </div>
-                    );
-                })
+                                <div className="project-card-body">
+                                    {proj.filteredComps.map((comp, i) => (
+                                        <ComponentRow key={i} comp={comp} />
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
             )}
         </div>
     );
