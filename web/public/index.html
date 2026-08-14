@@ -466,17 +466,35 @@
         .site-footer a:hover { color: var(--text); text-decoration: underline; }
 
         /* ── Responsive ────────────────────────────────────── */
+        @media (max-width: 768px) {
+            .stats-row { grid-template-columns: repeat(2, 1fr); }
+            .stats-row .stat-card:last-child { grid-column: span 2; }
+            .modal-content { max-height: 95vh; margin: 10px; }
+        }
+        
         @media (max-width: 600px) {
             .stats-row { grid-template-columns: 1fr; }
-            .comp-right { flex-direction: column; align-items: flex-end; gap: 6px; }
+            .stats-row .stat-card:last-child { grid-column: auto; }
+            
+            .comp-info { flex-direction: column; align-items: flex-start; gap: 10px; }
+            .comp-right { flex-direction: row; align-items: center; justify-content: space-between; width: 100%; gap: 6px; }
+            .comp-meta { text-align: left; }
+            
             .header-right .last-updated { display: none; }
-            .incident-duration { font-size: 12px; }
+            
+            .incident-row { flex-direction: column; }
+            .incident-duration { align-self: flex-start; margin-top: 4px; margin-left: 32px; }
+            .incident-time { margin-bottom: 2px; }
         }
+        
         @media (max-width: 420px) {
             .wrap { padding: 0 14px; }
             .comp-row { padding: 14px 16px; }
             .card-header { padding: 14px 16px; }
             .bars-wrap { height: 26px; }
+            
+            .banner-title { font-size: 18px; }
+            .stat-value { font-size: 22px; }
         }
 
         /* ── Animations ────────────────────────────────────── */
@@ -713,7 +731,7 @@
 
         let html = `
 ${attentionHtml}
-<div class="status-banner ${bannerClass} fade-in" style="position: sticky; top: 76px; z-index: 90;">
+<div class="status-banner ${bannerClass} fade-in">
     <div class="banner-body">
         <div class="banner-icon">${bannerIcon}</div>
         <div>
@@ -723,7 +741,7 @@ ${attentionHtml}
     </div>
 </div>
 
-<div class="stats-row fade-in" style="position: sticky; top: 195px; z-index: 80;">
+<div class="stats-row fade-in">
     <div class="stat-card">
         <div class="stat-label">7-Kunlik Uptime</div>
         <div class="stat-value">${upPct}<span>%</span></div>
@@ -800,6 +818,9 @@ ${attentionHtml}
         }
 
         html += `</div>`; // .status-card
+
+        // Maintenance Logs
+        html += renderMaintenanceLogsSection(data.maintenance_logs || []);
 
         // Recent Outages
         html += renderOutagesSection(data.recent_outages || []);
@@ -996,6 +1017,39 @@ ${attentionHtml}
 </div>`;
             });
         }
+
+        html += `</div>`;
+        return html;
+    }
+
+    function renderMaintenanceLogsSection(logs) {
+        if (!logs || logs.length === 0) return '';
+        
+        let html = `
+<div class="incidents-card fade-in">
+    <div class="card-header">
+        <div class="card-title">Tizim yangilanishlari (Restart)</div>
+        <div class="date-range">Oxirgi hodisalar</div>
+    </div>`;
+
+        logs.forEach(log => {
+            const dur = log.duration_seconds != null ? fmtDuration(log.duration_seconds) : '';
+            const startFmt = fmtDateTime(log.started_at);
+            const timeAgoStr = timeAgo(log.started_at);
+
+            html += `
+<div class="incident-row">
+    <div class="incident-icon">🔄</div>
+    <div class="incident-body">
+        <div class="incident-service">
+            ${escHtml(log.description || 'Tizim qayta ishga tushirildi')}
+            <span class="proj-badge up" style="font-size: 9px; padding: 1px 5px;">${escHtml(timeAgoStr)}</span>
+        </div>
+        <div class="incident-time">${escHtml(startFmt)}</div>
+    </div>
+    <div class="incident-duration">${escHtml(dur)}</div>
+</div>`;
+        });
 
         html += `</div>`;
         return html;

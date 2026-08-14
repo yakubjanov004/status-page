@@ -33,6 +33,15 @@ func InitScheduler() *Scheduler {
 }
 
 func (s *Scheduler) StartAll() {
+	// Log the restart event
+	logID, err := db.LogMaintenanceEvent("restart", "Status Page Service Restart")
+	if err != nil {
+		log.Println("[SCHEDULER] Error logging maintenance event:", err)
+	} else {
+		// As this is a simple restart, we immediately complete it
+		_ = db.CompleteMaintenanceEvent(logID)
+	}
+
 	monitors, err := db.GetActiveMonitors()
 	if err != nil {
 		log.Println("[SCHEDULER] Error fetching monitors:", err)

@@ -17,8 +17,9 @@ type PublicStatusResponse struct {
 	OverallUptime   float64             `json:"overall_uptime_pct"`
 	TotalServices   int                 `json:"total_services"`
 	ActiveIncidents int                 `json:"active_incidents"`
-	Projects        []PublicProjectData `json:"projects"`
-	RecentOutages   []RecentOutage      `json:"recent_outages"`
+	Projects        []PublicProjectData     `json:"projects"`
+	RecentOutages   []RecentOutage          `json:"recent_outages"`
+	MaintenanceLogs []models.MaintenanceLog `json:"maintenance_logs"`
 }
 
 type PublicProjectData struct {
@@ -217,6 +218,12 @@ func GetPublicStatusHandler(cfg *config.Config) http.HandlerFunc {
 			overallUptime = totalUptimeSum / float64(totalUptimeCount)
 		}
 
+		// Maintenance Logs
+		maintenanceLogs, _ := db.GetRecentMaintenanceLogs(10)
+		if maintenanceLogs == nil {
+			maintenanceLogs = []models.MaintenanceLog{}
+		}
+
 		// RecentOutages ni yangilari birinchi bo'lishi uchun tartiblash
 		sortRecentOutages(allRecentOutages)
 
@@ -236,6 +243,7 @@ func GetPublicStatusHandler(cfg *config.Config) http.HandlerFunc {
 			ActiveIncidents: activeIncidents,
 			Projects:        []PublicProjectData{},
 			RecentOutages:   allRecentOutages,
+			MaintenanceLogs: maintenanceLogs,
 		}
 
 		for _, p := range projectList {

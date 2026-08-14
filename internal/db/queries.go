@@ -104,3 +104,48 @@ func GetRecentHeartbeats(monitorID int, limit int) ([]models.Heartbeat, error) {
 	}
 	return hbs, nil
 }
+
+func LogMaintenanceEvent(eventType, description string) (int, error) {
+	res, err := DB.Exec(`INSERT INTO maintenance_log (event_type, description) VALUES (?, ?)`, eventType, description)
+	if err != nil {
+		return 0, err
+	}
+	id, err := res.LastInsertId()
+	return int(id), err
+}
+
+func CompleteMaintenanceEvent(id int) error {
+	_, err := DB.Exec(`
+		UPDATE maintenance_log 
+		SET ended_at = CURRENT_TIMESTAMP, 
+		    duration_seconds = CAST((julianday(CURRENT_TIMESTAMP) - julianday(started_at)) * 86400 AS INTEGER)
+		WHERE id = ?`, id)
+	return err
+}
+
+func GetRecentMaintenanceLogs(limit int) ([]models.MaintenanceLog, error) {
+	rows, err := DB.Query(`SELECT id, event_type, description, started_at, ended_at, duration_seconds FROM maintenance_log ORDER BY started_at DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var logs []models.MaintenanceLog
+	for rows.Next() {
+		var log models.MaintenanceLog
+		var endedAt sql.NullTime
+		var durationSecs sql.NullInt64
+		if err := rows.Scan(&log.ID, &log.EventType, &log.Description, &log.StartedAt, &endedAt, &durationSecs); err != nil {
+			return nil, err
+		}
+		if endedAt.Valid {
+			log.EndedAt = &endedAt.Time
+		}
+		if durationSecs.Valid {
+			dur := int(durationSecs.Int64)
+			log.DurationSeconds = &dur
+		}
+		logs = append(logs, log)
+	}
+	return logs, nil
+}
