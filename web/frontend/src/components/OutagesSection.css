@@ -1,0 +1,86 @@
+.incidents-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    margin-bottom: 20px;
+}
+
+.incidents-empty {
+    padding: 36px 24px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.incidents-empty .ei-icon {
+    font-size: 32px;
+    margin-bottom: 10px;
+}
+
+.incident-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border-soft);
+    transition: background var(--transition);
+}
+
+.incident-row:last-child {
+    border-bottom: none;
+}
+
+.incident-row:hover {
+    background: var(--surface-2);
+}
+
+.incident-icon {
+    font-size: 18px;
+    margin-top: 1px;
+    flex-shrink: 0;
+}
+
+.incident-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.incident-service {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.ongoing-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 7px;
+    background: var(--down-bg);
+    color: var(--down-text);
+    border: 1px solid var(--down-border);
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    animation: fade-ongoing 1.5s infinite;
+}
+
+.incident-time {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 3px;
+}
+
+.incident-duration {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+}

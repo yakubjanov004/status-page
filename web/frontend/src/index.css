@@ -1,0 +1,137 @@
+/* ── Design Tokens ─────────────────────────────────── */
+:root {
+    --bg:          #f8f9fa;
+    --surface:     #ffffff;
+    --surface-2:   #f4f4f6;
+    --border:      #e5e7eb;
+    --border-soft: #f0f0f2;
+    --text:        #111827;
+    --text-2:      #374151;
+    --text-muted:  #6b7280;
+    --text-faint:  #9ca3af;
+
+    --up:          #10b981;
+    --up-bg:       #ecfdf5;
+    --up-border:   #a7f3d0;
+    --up-text:     #065f46;
+
+    --warn:        #f59e0b;
+    --warn-bg:     #fffbeb;
+    --warn-border: #fde68a;
+    --warn-text:   #78350f;
+
+    --down:        #ef4444;
+    --down-bg:     #fef2f2;
+    --down-border: #fecaca;
+    --down-text:   #991b1b;
+
+    --accent:      #6366f1;
+    --accent-2:    #8b5cf6;
+
+    --radius-sm:   6px;
+    --radius-md:   10px;
+    --radius-lg:   14px;
+
+    --shadow-sm:   0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md:   0 4px 16px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04);
+
+    --transition:  0.18s ease;
+}
+
+[data-theme="dark"] {
+    --bg:          #0d1117;
+    --surface:     #161b22;
+    --surface-2:   #1c2128;
+    --border:      #30363d;
+    --border-soft: #21262d;
+    --text:        #e6edf3;
+    --text-2:      #c9d1d9;
+    --text-muted:  #8b949e;
+    --text-faint:  #6e7681;
+
+    --up-bg:       #0d2b1e;
+    --up-border:   #1a4731;
+    --up-text:     #3fb950;
+
+    --warn-bg:     #2b1e08;
+    --warn-border: #5a3e0a;
+    --warn-text:   #d29922;
+
+    --down-bg:     #2b1218;
+    --down-border: #5a1c24;
+    --down-text:   #f85149;
+
+    --shadow-sm:   0 1px 3px rgba(0,0,0,0.3);
+    --shadow-md:   0 4px 16px rgba(0,0,0,0.4);
+}
+
+/* ── Reset ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    transition: background var(--transition), color var(--transition);
+}
+
+/* ── Layout ────────────────────────────────────────── */
+.wrap { max-width: 860px; margin: 0 auto; padding: 0 20px; }
+
+/* ── Animations ────────────────────────────────────── */
+@keyframes fade-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fade-in 0.3s ease both; }
+
+@keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+@keyframes pulse-down {
+    0%, 100% { box-shadow: 0 0 0 2px rgba(239,68,68,0.2); }
+    50% { box-shadow: 0 0 0 5px rgba(239,68,68,0.05); }
+}
+
+@keyframes fade-ongoing {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+}
+
+/* ── Responsive ────────────────────────────────────── */
+@media (max-width: 768px) {
+    .stats-row { grid-template-columns: repeat(2, 1fr) !important; }
+    .stats-row .stat-card:last-child { grid-column: span 2; }
+    .modal-content { max-height: 95vh !important; margin: 10px !important; }
+}
+
+@media (max-width: 600px) {
+    .stats-row { grid-template-columns: 1fr !important; }
+    .stats-row .stat-card:last-child { grid-column: auto; }
+    .comp-info { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
+    .comp-right { flex-direction: row !important; align-items: center !important; justify-content: space-between !important; width: 100% !important; gap: 6px !important; }
+    .comp-meta { text-align: left !important; }
+    .header-right .last-updated { display: none !important; }
+    .incident-row { flex-direction: column !important; }
+    .incident-duration { align-self: flex-start !important; margin-top: 4px !important; margin-left: 32px !important; }
+    .incident-time { margin-bottom: 2px !important; }
+}
+
+@media (max-width: 420px) {
+    .wrap { padding: 0 14px; }
+    .comp-row { padding: 14px 16px !important; }
+    .card-header { padding: 14px 16px !important; }
+    .bars-wrap { height: 26px !important; }
+    .banner-title { font-size: 18px !important; }
+    .stat-value { font-size: 22px !important; }
+}

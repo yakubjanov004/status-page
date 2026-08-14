@@ -1,0 +1,22 @@
+.legend-row {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    padding: 12px;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 10px;
+    flex-wrap: wrap;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+}

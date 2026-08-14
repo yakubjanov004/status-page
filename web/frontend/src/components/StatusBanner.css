@@ -1,0 +1,60 @@
+.status-banner {
+    border-radius: var(--radius-lg);
+    padding: 24px 28px;
+    margin-bottom: 28px;
+    border: 1px solid;
+    position: relative;
+    overflow: hidden;
+    transition: all var(--transition);
+}
+
+.status-banner::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0.05;
+    background: radial-gradient(ellipse at top left, currentColor 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.status-banner.operational {
+    background: var(--up-bg);
+    border-color: var(--up-border);
+    color: var(--up-text);
+}
+
+.status-banner.degraded {
+    background: var(--warn-bg);
+    border-color: var(--warn-border);
+    color: var(--warn-text);
+}
+
+.status-banner.outage {
+    background: var(--down-bg);
+    border-color: var(--down-border);
+    color: var(--down-text);
+}
+
+.banner-body {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.banner-icon {
+    font-size: 28px;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.banner-title {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.4px;
+    margin-bottom: 3px;
+}
+
+.banner-sub {
+    font-size: 13px;
+    opacity: 0.8;
+}

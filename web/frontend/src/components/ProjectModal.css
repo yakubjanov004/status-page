@@ -1,0 +1,106 @@
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+}
+
+.modal-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.modal-content {
+    background: var(--surface);
+    width: 100%;
+    max-width: 650px;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    display: flex;
+    flex-direction: column;
+    max-height: 85vh;
+    transform: translateY(10px);
+    transition: transform 0.2s;
+}
+
+.modal-overlay.open .modal-content {
+    transform: translateY(0);
+}
+
+.modal-header {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border-soft);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h2 {
+    font-size: 16px;
+    margin: 0;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 22px;
+    cursor: pointer;
+    color: var(--text-muted);
+    line-height: 1;
+    padding: 0 4px;
+}
+
+.modal-close:hover {
+    color: var(--text);
+}
+
+.modal-tabs {
+    display: flex;
+    gap: 8px;
+    padding: 12px 24px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border-soft);
+}
+
+.tab-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 4px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-family: inherit;
+    transition: all var(--transition);
+}
+
+.tab-btn.active {
+    background: var(--text);
+    color: var(--surface);
+    border-color: var(--text);
+}
+
+.modal-body {
+    padding: 0;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.modal-loading {
+    padding: 24px;
+    text-align: center;
+    color: var(--text-muted);
+}
+
+.modal-error {
+    padding: 24px;
+    text-align: center;
+    color: var(--down);
+}
