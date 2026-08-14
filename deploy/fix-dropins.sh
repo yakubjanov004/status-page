@@ -66,7 +66,7 @@ done
 
 printf '\n------------------------------------------------------\n'
 printf '  Fixed: %d   Already OK: %d\n' "$FIXED" "$SKIPPED"
-printf '------------------------------------------------------\n\n'
+printf '%s\n\n' '------------------------------------------------------'
 
 if ! $DRY_RUN && [ "$FIXED" -gt 0 ]; then
     printf '  Running: systemctl daemon-reload\n'
