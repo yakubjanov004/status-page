@@ -22,8 +22,8 @@
 }
 
 .bar.c-100  { background: var(--up); }
-.bar.c-good { background: #34d399; }
 .bar.c-warn { background: var(--warn); }
+.bar.c-orange { background: #f97316; }
 .bar.c-bad  { background: var(--down); }
 .bar.c-none { background: var(--border); opacity: 0.6; }
 .bar.c-nodata {

@@ -19,14 +19,16 @@ export default function UptimeBars({ history }) {
                         // Hozir down bo'lsa — qizil
                         barClass = 'c-bad';
                     } else if (p >= 100 && !hasOutages) {
+                        // Faqat 100% va uzilish yo'q — yashil
                         barClass = 'c-100';
-                    } else if (p >= 99 && !hasOutages) {
-                        barClass = 'c-100';
-                    } else if (p >= 95) {
-                        barClass = hasOutages ? 'c-warn' : 'c-good';
-                    } else if (p >= 50) {
+                    } else if (p >= 90) {
+                        // 90%-99.999% yoki 100% lekin uzilish bor — sariq
                         barClass = 'c-warn';
+                    } else if (p >= 50) {
+                        // 50%-89.999% — to'q sariq (yomon)
+                        barClass = 'c-orange';
                     } else {
+                        // 50% dan past — qizil
                         barClass = 'c-bad';
                     }
 
