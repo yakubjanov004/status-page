@@ -12,11 +12,13 @@ import (
 )
 
 type ProjectDetailResponse struct {
-	ID         int             `json:"id"`
-	Name       string          `json:"name"`
-	Slug       string          `json:"slug"`
-	Components []ComponentData `json:"components"`
-	Incidents  []RecentOutage  `json:"incidents"`
+	ID            int             `json:"id"`
+	Name          string          `json:"name"`
+	Slug          string          `json:"slug"`
+	Components    []ComponentData `json:"components"`
+	Incidents     []RecentOutage  `json:"incidents"`
+	RestartCount  int             `json:"restart_count"`
+	LastRestartAt string          `json:"last_restart_at,omitempty"`
 }
 
 func GetProjectStatusHandler(cfg *config.Config) http.HandlerFunc {
@@ -53,8 +55,15 @@ func GetProjectStatusHandler(cfg *config.Config) http.HandlerFunc {
 			return
 		}
 
+		restartStats, err := db.GetRestartStats()
+		if err != nil {
+			restartStats = map[string]db.RestartStat{}
+		}
+
 		var components []ComponentData
 		var allRecentOutages []RecentOutage
+		totalRestarts := 0
+		var lastRestartAt time.Time
 
 		for _, m := range monitors {
 			if m.ProjectID == nil || *m.ProjectID != projectID || !m.ShowOnPublicPage {
@@ -108,6 +117,19 @@ func GetProjectStatusHandler(cfg *config.Config) http.HandlerFunc {
 			}
 
 			compName := strings.ToUpper(m.ComponentType[:1]) + m.ComponentType[1:]
+
+			restartCount := 0
+			compLastRestartAt := ""
+			restartKey := db.NormalizeServiceKey(slug + "-" + m.ComponentType)
+			if st, ok := restartStats[restartKey]; ok {
+				restartCount = st.Count
+				compLastRestartAt = st.LastAt.UTC().Format(time.RFC3339)
+				totalRestarts += st.Count
+				if st.LastAt.After(lastRestartAt) {
+					lastRestartAt = st.LastAt
+				}
+			}
+
 			components = append(components, ComponentData{
 				Name:              compName,
 				Type:              m.ComponentType,
@@ -119,6 +141,8 @@ func GetProjectStatusHandler(cfg *config.Config) http.HandlerFunc {
 				LongestOutageSecs: longestOutage,
 				CreatedAt:         m.CreatedAt.Format(time.RFC3339),
 				History:           history,
+				RestartCount:      restartCount,
+				LastRestartAt:     compLastRestartAt,
 			})
 		}
 
@@ -128,11 +152,15 @@ func GetProjectStatusHandler(cfg *config.Config) http.HandlerFunc {
 		}
 
 		response := ProjectDetailResponse{
-			ID:         projectID,
-			Name:       projectName,
-			Slug:       slug,
-			Components: components,
-			Incidents:  allRecentOutages,
+			ID:           projectID,
+			Name:         projectName,
+			Slug:         slug,
+			Components:   components,
+			Incidents:    allRecentOutages,
+			RestartCount: totalRestarts,
+		}
+		if !lastRestartAt.IsZero() {
+			response.LastRestartAt = lastRestartAt.Format(time.RFC3339)
 		}
 
 		json.NewEncoder(w).Encode(response)

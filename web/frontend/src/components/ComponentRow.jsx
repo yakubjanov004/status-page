@@ -1,8 +1,8 @@
-import { fmtDuration } from '../utils/format';
+import { fmtDuration, timeAgo } from '../utils/format';
 import UptimeBars from './UptimeBars';
 import './ComponentRow.css';
 
-export default function ComponentRow({ comp }) {
+export default function ComponentRow({ comp, isPrimaryProblem }) {
     const isUp = comp.is_up;
     const pct = typeof comp.uptime_pct === 'number' ? comp.uptime_pct : 100;
     const dotClass = isUp ? (pct < 100 ? 'warn' : 'up') : 'down';
@@ -13,6 +13,7 @@ export default function ComponentRow({ comp }) {
     const downSecs = comp.total_downtime_secs || 0;
     const outCount = comp.total_outages || 0;
     const latency = comp.latency || 0;
+    const restartCount = comp.restart_count || 0;
 
     let metaStr = '';
     if (outCount > 0) {
@@ -22,12 +23,19 @@ export default function ComponentRow({ comp }) {
     }
 
     return (
-        <div className={`comp-row ${rowClass}`}>
+        <div className={`comp-row ${rowClass} ${isPrimaryProblem ? 'comp-row-highlight' : ''}`}>
+            {isPrimaryProblem && <div className="problem-flag">MUAMMO SHU YERDA</div>}
             <div className="comp-info">
                 <div className="comp-left">
                     <div className={`status-dot ${dotClass}`}></div>
                     <div className="comp-name">{comp.name}</div>
                     <div className={`comp-status-badge ${badgeClass}`}>{statusText}</div>
+                    {restartCount > 0 && (
+                        <div className="restart-mini-badge" title="Qayta ishga tushirishlar soni">
+                            🔄 {restartCount}x
+                            {comp.last_restart_at && ` · ${timeAgo(comp.last_restart_at)}`}
+                        </div>
+                    )}
                 </div>
                 <div className="comp-right">
                     {latency > 0 && <div className="latency-badge">{latency}ms</div>}

@@ -1,6 +1,6 @@
 import './StatusBanner.css';
 
-export default function StatusBanner({ status }) {
+export default function StatusBanner({ status, problem, onOpenProject }) {
     let bannerClass = 'operational';
     let bannerIcon = '✅';
     let bannerTitle = 'Barcha tizimlar ishlamoqda';
@@ -23,10 +23,19 @@ export default function StatusBanner({ status }) {
         <div className={`status-banner ${bannerClass} fade-in`}>
             <div className="banner-body">
                 <div className="banner-icon">{bannerIcon}</div>
-                <div>
+                <div className="banner-text">
                     <div className="banner-title">{bannerTitle}</div>
                     <div className="banner-sub">{bannerSub}</div>
                 </div>
+                {problem && (
+                    <button
+                        className="banner-problem-chip"
+                        onClick={() => onOpenProject && onOpenProject(problem.projectSlug)}
+                    >
+                        <span className="banner-problem-dot" />
+                        Muammo: <strong>{problem.projectName} — {problem.componentName}</strong>
+                    </button>
+                )}
             </div>
         </div>
     );

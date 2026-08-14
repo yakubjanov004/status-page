@@ -1,6 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useStatus } from './hooks/useStatus';
 import { useWebSocket } from './hooks/useWebSocket';
+import { findPrimaryProblem } from './utils/problem';
 import Header from './components/Header';
 import StatusBanner from './components/StatusBanner';
 import StatsRow from './components/StatsRow';
@@ -22,6 +23,8 @@ export default function App() {
 
     // WebSocket — yangilanish kelganda refresh chaqiramiz
     useWebSocket(refresh);
+
+    const primaryProblem = useMemo(() => findPrimaryProblem(data?.projects), [data]);
 
     const handleOpenProject = useCallback((slug) => {
         setModalSlug(slug);
@@ -71,7 +74,11 @@ export default function App() {
                             <>
 
 
-                                <StatusBanner status={data.status} />
+                                <StatusBanner
+                                    status={data.status}
+                                    problem={primaryProblem}
+                                    onOpenProject={handleOpenProject}
+                                />
 
                                 <StatsRow
                                     overallUptime={data.overall_uptime_pct}
@@ -86,6 +93,7 @@ export default function App() {
                                     showOnlyIssues={showOnlyIssues}
                                     onToggleIssues={handleToggleIssues}
                                     onOpenProject={handleOpenProject}
+                                    primaryProblem={primaryProblem}
                                 />
 
                                 <EventsTabs

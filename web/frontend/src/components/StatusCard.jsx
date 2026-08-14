@@ -1,4 +1,4 @@
-import { fmtDate } from '../utils/format';
+import { fmtDate, timeAgo } from '../utils/format';
 import FilterBar from './FilterBar';
 import ComponentRow from './ComponentRow';
 import './StatusCard.css';
@@ -10,6 +10,7 @@ export default function StatusCard({
     showOnlyIssues,
     onToggleIssues,
     onOpenProject,
+    primaryProblem,
 }) {
     // Date range
     let dateRangeStr = "So'nggi 7 kun";
@@ -64,7 +65,7 @@ export default function StatusCard({
                 onToggleIssues={onToggleIssues}
             />
             <div className="section-header">
-                <div className="section-title">Tizim holati</div>
+                <div className="section-title">Loyihalar</div>
                 <div className="date-range">‹ {dateRangeStr} ›</div>
             </div>
 
@@ -96,20 +97,38 @@ export default function StatusCard({
                                     className="project-card-header"
                                     onClick={() => onOpenProject(proj.slug)}
                                 >
-                                    <div className="project-card-left">
-                                        <span className="project-card-icon">{statusIcon}</span>
-                                        <span className="project-card-name">{proj.name}</span>
+                                    <div className="project-card-top">
+                                        <div className="project-card-left">
+                                            <span className="project-card-icon">{statusIcon}</span>
+                                            <span className="project-card-name">{proj.name}</span>
+                                        </div>
                                         <span className={`proj-badge ${badgeClass}`}>
                                             {badgeText}
                                         </span>
                                     </div>
-                                    <span className="project-card-hint">
-                                        Batafsil ko'rish uchun bosing
-                                    </span>
+                                    <div className="project-card-meta-row">
+                                        {proj.restart_count > 0 && (
+                                            <span className="restart-badge" title="Qayta ishga tushirishlar soni">
+                                                🔄 {proj.restart_count} marta restart
+                                                {proj.last_restart_at && ` · ${timeAgo(proj.last_restart_at)}`}
+                                            </span>
+                                        )}
+                                        <span className="project-card-hint">
+                                            Batafsil ko'rish uchun bosing →
+                                        </span>
+                                    </div>
                                 </div>
                                 <div className="project-card-body">
                                     {proj.filteredComps.map((comp, i) => (
-                                        <ComponentRow key={i} comp={comp} />
+                                        <ComponentRow
+                                            key={i}
+                                            comp={comp}
+                                            isPrimaryProblem={
+                                                !!primaryProblem &&
+                                                primaryProblem.projectSlug === proj.slug &&
+                                                primaryProblem.componentName === comp.name
+                                            }
+                                        />
                                     ))}
                                 </div>
                             </div>

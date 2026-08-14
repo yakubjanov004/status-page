@@ -1,10 +1,15 @@
 .status-banner {
     border-radius: var(--radius-lg);
-    padding: 24px 28px;
+    padding: 18px 24px;
     margin-bottom: 28px;
     border: 1px solid;
-    position: relative;
+    position: sticky;
+    top: 56px;
+    z-index: 90;
     overflow: hidden;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: var(--shadow-sm);
     transition: all var(--transition);
 }
 
@@ -18,19 +23,19 @@
 }
 
 .status-banner.operational {
-    background: var(--up-bg);
+    background: color-mix(in srgb, var(--up-bg) 92%, transparent);
     border-color: var(--up-border);
     color: var(--up-text);
 }
 
 .status-banner.degraded {
-    background: var(--warn-bg);
+    background: color-mix(in srgb, var(--warn-bg) 92%, transparent);
     border-color: var(--warn-border);
     color: var(--warn-text);
 }
 
 .status-banner.outage {
-    background: var(--down-bg);
+    background: color-mix(in srgb, var(--down-bg) 92%, transparent);
     border-color: var(--down-border);
     color: var(--down-text);
 }
@@ -39,22 +44,73 @@
     display: flex;
     align-items: center;
     gap: 14px;
+    flex-wrap: wrap;
 }
 
 .banner-icon {
-    font-size: 28px;
+    font-size: 24px;
     flex-shrink: 0;
     line-height: 1;
 }
 
+.banner-text {
+    flex: 1;
+    min-width: 180px;
+}
+
 .banner-title {
-    font-size: 20px;
+    font-size: 17px;
     font-weight: 700;
-    letter-spacing: -0.4px;
-    margin-bottom: 3px;
+    letter-spacing: -0.3px;
+    margin-bottom: 2px;
 }
 
 .banner-sub {
-    font-size: 13px;
+    font-size: 12.5px;
     opacity: 0.8;
+}
+
+/* ── Aniq muammo chipi — foydalanuvchi darhol qaysi joyda muammo borligini ko'radi ── */
+.banner-problem-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid currentColor;
+    background: var(--surface);
+    color: inherit;
+    font-size: 12.5px;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: transform var(--transition), box-shadow var(--transition);
+}
+
+.banner-problem-chip:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+.banner-problem-chip strong {
+    font-weight: 700;
+}
+
+.banner-problem-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+    animation: pulse-down 1.5s infinite;
+}
+
+@media (max-width: 600px) {
+    .status-banner {
+        padding: 14px 16px;
+    }
+    .banner-problem-chip {
+        width: 100%;
+        justify-content: center;
+    }
 }

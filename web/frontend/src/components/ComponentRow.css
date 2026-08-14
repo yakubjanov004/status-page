@@ -3,6 +3,7 @@
     border-bottom: 1px solid var(--border-soft);
     transition: background var(--transition), border-color var(--transition);
     border-left: 3px solid transparent;
+    position: relative;
 }
 
 .comp-row.row-up {
@@ -36,6 +37,48 @@
     background: color-mix(in srgb, var(--warn-bg) 70%, var(--surface-2) 30%);
 }
 
+/* ── Aynan shu joyda muammo — bir dona aniq belgilangan komponent ── */
+.comp-row-highlight {
+    border-left-width: 5px;
+    box-shadow: inset 0 0 0 1px var(--down-border);
+    animation: highlight-glow 2s infinite;
+    padding-top: 32px;
+}
+
+.problem-flag {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    color: #fff;
+    background: var(--down);
+    padding: 3px 10px;
+    border-radius: 0 0 6px 0;
+    width: fit-content;
+}
+
+@keyframes highlight-glow {
+    0%, 100% { box-shadow: inset 0 0 0 1px var(--down-border); }
+    50% { box-shadow: inset 0 0 0 1px var(--down), 0 0 0 3px color-mix(in srgb, var(--down) 15%, transparent); }
+}
+
+/* ── Restart mini badge — komponent qatorida ── */
+.restart-mini-badge {
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: var(--surface);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    white-space: nowrap;
+}
+
 .comp-info {
     display: flex;
     justify-content: space-between;
@@ -47,6 +90,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
 }
 
 .status-dot {

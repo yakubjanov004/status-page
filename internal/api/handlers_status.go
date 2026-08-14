@@ -23,10 +23,12 @@ type PublicStatusResponse struct {
 }
 
 type PublicProjectData struct {
-	ID         int             `json:"id"`
-	Name       string          `json:"name"`
-	Slug       string          `json:"slug"`
-	Components []ComponentData `json:"components"`
+	ID            int             `json:"id"`
+	Name          string          `json:"name"`
+	Slug          string          `json:"slug"`
+	Components    []ComponentData `json:"components"`
+	RestartCount  int             `json:"restart_count"`
+	LastRestartAt string          `json:"last_restart_at,omitempty"`
 }
 
 type Outage struct {
@@ -54,6 +56,8 @@ type ComponentData struct {
 	LongestOutageSecs int           `json:"longest_outage_secs"`
 	CreatedAt         string        `json:"created_at"`
 	History           []DailyStatus `json:"history"`
+	RestartCount      int           `json:"restart_count"`
+	LastRestartAt     string        `json:"last_restart_at,omitempty"`
 }
 
 type DailyStatus struct {
@@ -109,6 +113,12 @@ func GetPublicStatusHandler(cfg *config.Config) http.HandlerFunc {
 		monitors, err := db.GetAllMonitors()
 		if err != nil {
 			monitors = nil
+		}
+
+		// Restart statistikasi (systemd/docker kuzatuvchidan yig'ilgan)
+		restartStats, err := db.GetRestartStats()
+		if err != nil {
+			restartStats = map[string]db.RestartStat{}
 		}
 
 		hasUp := false
@@ -198,6 +208,14 @@ func GetPublicStatusHandler(cfg *config.Config) http.HandlerFunc {
 
 			compName := strings.ToUpper(m.ComponentType[:1]) + m.ComponentType[1:]
 
+			restartCount := 0
+			lastRestartAt := ""
+			restartKey := db.NormalizeServiceKey(projectList[projIdx].data.Slug + "-" + m.ComponentType)
+			if st, ok := restartStats[restartKey]; ok {
+				restartCount = st.Count
+				lastRestartAt = st.LastAt.UTC().Format(time.RFC3339)
+			}
+
 			projectList[projIdx].data.Components = append(projectList[projIdx].data.Components, ComponentData{
 				Name:              compName,
 				Type:              m.ComponentType,
@@ -209,7 +227,27 @@ func GetPublicStatusHandler(cfg *config.Config) http.HandlerFunc {
 				LongestOutageSecs: longestOutage,
 				CreatedAt:         m.CreatedAt.Format(time.RFC3339),
 				History:           history,
+				RestartCount:      restartCount,
+				LastRestartAt:     lastRestartAt,
 			})
+		}
+
+		// 2.5 Har bir loyiha uchun restart sonini/vaqtini komponentlardan jamlaymiz
+		for i := range projectList {
+			total := 0
+			var lastAt time.Time
+			for _, c := range projectList[i].data.Components {
+				total += c.RestartCount
+				if c.LastRestartAt != "" {
+					if t, err := time.Parse(time.RFC3339, c.LastRestartAt); err == nil && t.After(lastAt) {
+						lastAt = t
+					}
+				}
+			}
+			projectList[i].data.RestartCount = total
+			if !lastAt.IsZero() {
+				projectList[i].data.LastRestartAt = lastAt.Format(time.RFC3339)
+			}
 		}
 
 		// 3. Response

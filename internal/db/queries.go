@@ -3,6 +3,9 @@ package db
 import (
 	"database/sql"
 	"status-page/internal/models"
+	"strconv"
+	"strings"
+	"time"
 )
 
 func GetAllMonitors() ([]models.Monitor, error) {
@@ -130,6 +133,73 @@ func CompleteMaintenanceEvent(id int) error {
 		    duration_seconds = CAST((julianday(CURRENT_TIMESTAMP) - julianday(started_at)) * 86400 AS INTEGER)
 		WHERE id = ?`, id)
 	return err
+}
+
+// NormalizeServiceKey — systemd unit ("datan-backend.service"), docker
+// konteyner nomi ("datan_backend_1") va monitor asosida qurilgan kalitni
+// ("datan-backend") bir xil formatga keltiradi, shunda ularni solishtirish
+// mumkin bo'ladi.
+func NormalizeServiceKey(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	s = strings.TrimPrefix(s, "docker: ")
+	s = strings.TrimSuffix(s, ".service")
+	s = strings.NewReplacer("_", "-", ".", "-").Replace(s)
+
+	// Docker compose konteynerlar oxiriga "-1", "-2" kabi raqam qo'shishi mumkin —
+	// buni olib tashlaymiz.
+	for {
+		idx := strings.LastIndex(s, "-")
+		if idx == -1 || idx == len(s)-1 {
+			break
+		}
+		if _, err := strconv.Atoi(s[idx+1:]); err == nil {
+			s = s[:idx]
+			continue
+		}
+		break
+	}
+	return s
+}
+
+// RestartStat — bitta xizmat (service) uchun restart soni va oxirgi marta
+// qachon restart qilingani.
+type RestartStat struct {
+	Count  int
+	LastAt time.Time
+}
+
+// GetRestartStats — maintenance_log jadvalidagi barcha "restart" turidagi
+// hodisalarni normalized service_name bo'yicha guruhlab, har biri uchun
+// sonini va oxirgi vaqtini qaytaradi.
+func GetRestartStats() (map[string]RestartStat, error) {
+	rows, err := DB.Query(`SELECT service_name, started_at FROM maintenance_log WHERE event_type = 'restart' AND service_name != ''`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	stats := make(map[string]RestartStat)
+	for rows.Next() {
+		var serviceName string
+		var startedAt time.Time
+		if err := rows.Scan(&serviceName, &startedAt); err != nil {
+			continue
+		}
+		key := NormalizeServiceKey(serviceName)
+		if key == "" {
+			continue
+		}
+		st := stats[key]
+		st.Count++
+		if startedAt.After(st.LastAt) {
+			st.LastAt = startedAt
+		}
+		stats[key] = st
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return stats, nil
 }
 
 func GetRecentMaintenanceLogs(limit int) ([]models.MaintenanceLog, error) {
