@@ -103,10 +103,11 @@ for unit in $UNITS; do
     if ! $DRY_RUN; then
         dropin_dir="$OUTPUT_DIR/${unit}.d"
         mkdir -p "$dropin_dir"
-        printf '[Service]\n' > "$dropin_dir/notify.conf"
+        printf '[Unit]\n' > "$dropin_dir/notify.conf"
+        printf 'OnFailure=notify@%%n.service\n\n' >> "$dropin_dir/notify.conf"
+        printf '[Service]\n' >> "$dropin_dir/notify.conf"
         printf 'ExecStartPost=/usr/local/bin/service-notify.sh up %%n\n' >> "$dropin_dir/notify.conf"
         printf 'ExecStopPost=/usr/local/bin/service-notify.sh down %%n\n' >> "$dropin_dir/notify.conf"
-        printf 'OnFailure=notify@%%n.service\n' >> "$dropin_dir/notify.conf"
         printf '      Written: %s/notify.conf\n' "$dropin_dir"
     fi
 done
