@@ -28,7 +28,7 @@ var projects = []projectDef{
 		Name: "Tokpoint",
 		Slug: "tokpoint",
 		Components: []componentDef{
-			{Name: "Tokpoint Backend", ComponentType: "backend", URL: "http://127.0.0.1:8001"},
+			{Name: "Tokpoint Backend", ComponentType: "backend", URL: "http://127.0.0.1:8001/health"},
 		},
 	},
 	{
@@ -46,7 +46,7 @@ var projects = []projectDef{
 		Name: "Datan",
 		Slug: "datan",
 		Components: []componentDef{
-			{Name: "Datan Backend", ComponentType: "backend", URL: "http://127.0.0.1:8003"},
+			{Name: "Datan Backend", ComponentType: "backend", URL: "http://127.0.0.1:8003/admin/login/"},
 		},
 	},
 	{
@@ -56,7 +56,7 @@ var projects = []projectDef{
 		Slug: "alfaconnect",
 		Components: []componentDef{
 			{Name: "AlfaConnect WebApp", ComponentType: "frontend", URL: "http://127.0.0.1:5175"},
-			{Name: "AlfaConnect API", ComponentType: "backend", URL: "http://127.0.0.1:8002"},
+			{Name: "AlfaConnect API", ComponentType: "backend", URL: "http://127.0.0.1:8002/health"},
 		},
 	},
 	{
