@@ -20,6 +20,9 @@ func GetAllMonitors() ([]models.Monitor, error) {
 		}
 		monitors = append(monitors, m)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return monitors, nil
 }
 
@@ -37,6 +40,9 @@ func GetActiveMonitors() ([]models.Monitor, error) {
 			return nil, err
 		}
 		monitors = append(monitors, m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return monitors, nil
 }
@@ -102,6 +108,9 @@ func GetRecentHeartbeats(monitorID int, limit int) ([]models.Heartbeat, error) {
 		}
 		hbs = append(hbs, hb)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return hbs, nil
 }
 
@@ -146,6 +155,9 @@ func GetRecentMaintenanceLogs(limit int) ([]models.MaintenanceLog, error) {
 			log.DurationSeconds = &dur
 		}
 		logs = append(logs, log)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return logs, nil
 }
